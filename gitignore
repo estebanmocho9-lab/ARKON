@@ -1,0 +1,25 @@
+# Secretos — NUNCA subir
+.env
+credentials.json
+
+# Dependencias — se reinstalan con npm install
+node_modules/
+node_modules.zip
+
+# Compilado — se regenera con npm run build / tsc
+dist/
+dist.zip
+
+# Backups propios duplicados (ya están las carpetas sueltas)
+database.zip
+src.zip
+
+# Logs y estado de ejecución — no es código
+logs/
+checkpoints/
+*.txt
+log-*.txt
+
+# Sistema
+.DS_Store
+Thumbs.db

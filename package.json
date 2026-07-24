@@ -1,0 +1,46 @@
+{
+  "name": "impulsoia",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "sync": "tsc && node dist/sheets/syncData.js",
+    "worker": "tsc && node dist/worker/workerTrabajos.js",
+    "check": "tsc --noEmit",
+    "extraer:01": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 01",
+    "extraer:02": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 02",
+    "extraer:03": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 03",
+    "extraer:04": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 04",
+    "extraer:05": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 05",
+    "extraer:06": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 06",
+    "extraer:07": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 07",
+    "extraer:08": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 08",
+    "extraer:09": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 09",
+    "extraer:10": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 10",
+    "extraer:todas": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts todas",
+    "extraer:paralelo": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts paralelo"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/mathjs": "^9.4.1",
+    "@types/node": "^25.9.0",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
+    "dotenv": "^17.4.2",
+    "googleapis": "^171.4.0",
+    "mathjs": "^15.2.0",
+    "pdf-parse": "^2.4.5",
+    "uuid": "^14.0.0"
+  }
+}
