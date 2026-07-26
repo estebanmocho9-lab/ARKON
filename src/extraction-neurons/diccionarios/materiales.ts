@@ -87,11 +87,26 @@ export async function cargarDiccionarioMateriales(): Promise<EntradaMaterial[]> 
 
 // ── Lee componentes_materiales de tu Supabase, POR SEPARADO de
 //    los materiales — para que el campo "componente" se pueda
-//    llenar de forma independiente de "material" ────────────────
+//    llenar de forma independiente de "material". Además, usa la
+//    relación real que ya tenés (id_material) para saber a qué
+//    material pertenece cada componente — así, si un libro
+//    menciona un componente puntual (ej. "Alita") sin nombrar el
+//    material completo, el sistema puede inferir solo que
+//    pertenece al "Cemento Portland" ────────────────────────────
 export async function cargarDiccionarioComponentes(): Promise<EntradaMaterial[]> {
   const combinado: EntradaMaterial[] = [];
 
   try {
+    // Traemos primero el catálogo de materiales para poder resolver
+    // el nombre del material padre a partir de id_material
+    const { data: catalogo } = await supabase.from('catalogo_materiales').select('*');
+    const mapaIdAMaterial = new Map<string, string>();
+    for (const fila of catalogo || []) {
+      const id = primerValorPresente(fila, ['id_material', 'id']);
+      const nombre = primerValorPresente(fila, ['nombre', 'nombre_material', 'name']);
+      if (id && nombre) mapaIdAMaterial.set(id, nombre);
+    }
+
     const { data: componentes, error: errorComponentes } = await supabase
       .from('componentes_materiales')
       .select('*');
@@ -102,12 +117,16 @@ export async function cargarDiccionarioComponentes(): Promise<EntradaMaterial[]>
       for (const fila of componentes || []) {
         const nombre = primerValorPresente(fila, ['nombre', 'nombre_componente', 'name']);
         if (!nombre) continue;
+        const idMaterial = primerValorPresente(fila, ['id_material']);
+        const materialPadre = idMaterial ? mapaIdAMaterial.get(idMaterial) || null : null;
+
         combinado.push({
           nombre_es: nombre,
           nombre_en: nombre,
           sinonimos: [],
           familia: primerValorPresente(fila, ['familia', 'family']) || 'Componente',
           subfamilia: primerValorPresente(fila, ['subfamilia', 'subfamily']) || '',
+          materialAsociado: materialPadre,
         });
       }
     }

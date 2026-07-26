@@ -16,6 +16,8 @@ import { UNIDADES, variantesDeMagnitud } from '../diccionarios/unidades';
 import { INSTRUMENTOS } from '../diccionarios/instrumentos';
 import { buscarNorma } from '../diccionarios/normas';
 import { ATRIBUTOS } from '../diccionarios/atributos';
+import { ESTADOS } from '../diccionarios/estados';
+import { AGENTES_EXPOSICION } from '../diccionarios/agentesExposicion';
 import { buscarControversiasDeInteres } from '../diccionarios/controversias';
 import { EntradaMaterial, PropiedadExtraida } from './tipos';
 
@@ -76,11 +78,31 @@ function buscarRango(ventana: string, posicionValor: number): { min: number; max
 
   const patronRango = /(-?\d+(?:[.,]\d+)?)\s*(?:a|to|[-–]|±)\s*(-?\d+(?:[.,]\d+)?)/;
   const match = patronRango.exec(entorno);
-  if (!match) return null;
-  const a = parseFloat(match[1].replace(',', '.'));
-  const b = parseFloat(match[2].replace(',', '.'));
-  if (isNaN(a) || isNaN(b)) return null;
-  return { min: Math.min(a, b), max: Math.max(a, b) };
+  if (match) {
+    const a = parseFloat(match[1].replace(',', '.'));
+    const b = parseFloat(match[2].replace(',', '.'));
+    if (!isNaN(a) && !isNaN(b)) return { min: Math.min(a, b), max: Math.max(a, b) };
+  }
+
+  // Segundo intento: tablas técnicas que ponen "mín" y "máx" como
+  // etiquetas separadas, sin ninguna palabra que conecte los dos
+  // números (típico de tablas de Ashby/CRC, columna por columna)
+  const DISTANCIA_TABLA = 80;
+  const inicioTabla = Math.max(0, posicionValor - DISTANCIA_TABLA);
+  const finTabla = Math.min(ventana.length, posicionValor + DISTANCIA_TABLA);
+  const entornoTabla = ventana.substring(inicioTabla, finTabla);
+
+  const patronMin = /\b(?:m[ií]n(?:imo)?|min)\.?\s*:?\s*(-?\d+(?:[.,]\d+)?)/i;
+  const patronMax = /\b(?:m[áa]x(?:imo)?|max)\.?\s*:?\s*(-?\d+(?:[.,]\d+)?)/i;
+  const matchMin = patronMin.exec(entornoTabla);
+  const matchMax = patronMax.exec(entornoTabla);
+  if (matchMin && matchMax) {
+    const min = parseFloat(matchMin[1].replace(',', '.'));
+    const max = parseFloat(matchMax[1].replace(',', '.'));
+    if (!isNaN(min) && !isNaN(max)) return { min: Math.min(min, max), max: Math.max(min, max) };
+  }
+
+  return null;
 }
 
 // ── Condición de ensayo (temperatura, condiciones) ───────────────
@@ -119,6 +141,54 @@ function buscarInstrumentoYMetodo(ventana: string): { instrumento: string | null
   return { instrumento, metodo };
 }
 
+// ── Estado físico/de curado del material dentro de la ventana ───
+function buscarEstado(ventana: string): string | null {
+  for (const estado of ESTADOS) {
+    const terminos = [estado.nombre_es, estado.nombre_en, ...estado.sinonimos];
+    for (const termino of terminos) {
+      if (!termino) continue;
+      const regex = new RegExp(`\\b${escaparRegex(termino)}\\b`, 'i');
+      if (regex.test(ventana)) return estado.nombre_es;
+    }
+  }
+  return null;
+}
+
+// ── Agente de exposición (humedad, cloruros, corrosión, pintura...)
+//    dentro de la ventana, junto con su posición (para poder buscar
+//    después si el valor corresponde a "antes" o "después" de esa
+//    exposición) ────────────────────────────────────────────────
+function buscarAgenteExposicion(ventana: string): { nombre: string; posicion: number } | null {
+  for (const agente of AGENTES_EXPOSICION) {
+    const terminos = [agente.nombre_es, agente.nombre_en, ...agente.sinonimos];
+    for (const termino of terminos) {
+      if (!termino) continue;
+      const regex = new RegExp(`\\b${escaparRegex(termino)}\\b`, 'i');
+      const match = regex.exec(ventana);
+      if (match) return { nombre: agente.nombre_es, posicion: match.index };
+    }
+  }
+  return null;
+}
+
+// ── Dado que se encontró un agente de exposición en cierta posición,
+//    mira el texto inmediatamente alrededor para ver si el valor
+//    corresponde a ANTES o DESPUÉS de esa exposición (ej. "antes de
+//    la exposición a humedad" vs "después de saturar en agua") ────
+const PALABRAS_ANTES = /\b(antes de|previo a|sin exponer|sin exposición|before|prior to|unexposed)\b/i;
+const PALABRAS_DESPUES = /\b(despu[eé]s de|tras|luego de|una vez expuesto|posterior a|after|following exposure)\b/i;
+
+function buscarMomentoExposicion(ventana: string, posicionAgente: number): 'Antes' | 'Después' | null {
+  const DISTANCIA = 50;
+  const inicio = Math.max(0, posicionAgente - DISTANCIA);
+  const fin = Math.min(ventana.length, posicionAgente + DISTANCIA);
+  const entorno = ventana.substring(inicio, fin);
+
+  if (PALABRAS_DESPUES.test(entorno)) return 'Después';
+  if (PALABRAS_ANTES.test(entorno)) return 'Antes';
+  return null;
+}
+
 // ── Material dentro de la ventana ÚNICAMENTE. Se sacó el "plan B"
 //    de buscar en la página completa: eso era lo que causaba que
 //    un material sin relación real apareciera pegado a una
@@ -143,16 +213,43 @@ function buscarMaterial(
 
 // ── Componente dentro de la ventana, contra su propio diccionario
 //    (separado del de materiales) ───────────────────────────────
-function buscarComponente(ventana: string, componentes: EntradaMaterial[]): string | null {
+function buscarComponente(
+  ventana: string,
+  componentes: EntradaMaterial[]
+): { nombre: string; materialAsociado: string | null } | null {
   for (const entrada of componentes) {
     const terminos = [entrada.nombre_es, entrada.nombre_en, ...entrada.sinonimos];
     for (const termino of terminos) {
       if (!termino || termino.length < 3) continue;
       const regex = new RegExp(`\\b${escaparRegex(termino)}\\b`, 'i');
-      if (regex.test(ventana)) return entrada.nombre_es;
+      if (regex.test(ventana)) return { nombre: entrada.nombre_es, materialAsociado: entrada.materialAsociado || null };
     }
   }
   return null;
+}
+
+// ── Si no se encontró material directamente pero sí un componente
+//    con material padre conocido (vía tu tabla real), lo usamos
+//    como material — así ningún dato queda "huérfano" solo porque
+//    el texto nombró el componente y no el material completo ────
+function resolverMaterialFinal(
+  materialInfo: { material: string | null; familia: string | null; subfamilia: string | null },
+  componenteInfo: { nombre: string; materialAsociado: string | null } | null,
+  materiales: EntradaMaterial[]
+): { material: string | null; familia: string | null; subfamilia: string | null; inferidoPorComponente: boolean } {
+  if (materialInfo.material) {
+    return { ...materialInfo, inferidoPorComponente: false };
+  }
+  if (componenteInfo?.materialAsociado) {
+    const entradaMaterial = materiales.find(m => m.nombre_es === componenteInfo.materialAsociado);
+    return {
+      material: componenteInfo.materialAsociado,
+      familia: entradaMaterial?.familia || null,
+      subfamilia: entradaMaterial?.subfamilia || null,
+      inferidoPorComponente: true,
+    };
+  }
+  return { ...materialInfo, inferidoPorComponente: false };
 }
 
 // ── Ecuación / fórmula: patrón "símbolo = expresión", pero ahora
@@ -240,7 +337,11 @@ export function analizarPagina(
         const norma = buscarNorma(ventana);
         const { instrumento, metodo } = buscarInstrumentoYMetodo(ventana);
         const materialInfo = buscarMaterial(ventana, materiales);
-        const componenteEncontrado = buscarComponente(ventana, componentes);
+        const componenteInfo = buscarComponente(ventana, componentes);
+        const materialFinal = resolverMaterialFinal(materialInfo, componenteInfo, materiales);
+        const estadoEncontrado = buscarEstado(ventana);
+        const agenteInfo = buscarAgenteExposicion(ventana);
+        const momentoExposicion = agenteInfo ? buscarMomentoExposicion(ventana, agenteInfo.posicion) : null;
         const condicionEnsayo = buscarCondicionEnsayo(ventana);
         const observaciones = buscarObservaciones(ventana);
         const relacion = buscarRelacionConOtrasPropiedades(ventana, propiedad.id);
@@ -263,7 +364,10 @@ export function analizarPagina(
         const notaControversia = controversias.length > 0
           ? `⚠ Controversia conocida: ${controversias[0].titulo_es}`
           : null;
-        const observacionesFinal = [observaciones, notaControversia].filter(Boolean).join(' | ') || null;
+        const notaMaterialInferido = materialFinal.inferidoPorComponente
+          ? `Material inferido a partir del componente "${componenteInfo?.nombre}" (relación de tu catálogo)`
+          : null;
+        const observacionesFinal = [observaciones, notaControversia, notaMaterialInferido].filter(Boolean).join(' | ') || null;
 
         registros.push({
           nombre_propiedad: propiedad.nombre_es,
@@ -271,10 +375,13 @@ export function analizarPagina(
           sinonimos: propiedad.sinonimos,
           categoria: propiedad.categoria,
           tipo_propiedad: propiedad.tipo_propiedad,
-          familia_material: materialInfo.familia,
-          subfamilia_material: materialInfo.subfamilia,
-          material: materialInfo.material,
-          componente: componenteEncontrado,
+          familia_material: materialFinal.familia,
+          subfamilia_material: materialFinal.subfamilia,
+          material: materialFinal.material,
+          componente: componenteInfo ? componenteInfo.nombre : null,
+          estado_material: estadoEncontrado,
+          agente_exposicion: agenteInfo ? agenteInfo.nombre : null,
+          momento_exposicion: momentoExposicion,
           unidad: hallazgoValor ? hallazgoValor.unidad : null,
           simbolo: simboloEncontrado,
           valor_encontrado: hallazgoValor ? hallazgoValor.valor : (ecuacion ? null : null),
@@ -313,8 +420,15 @@ export function analizarPagina(
         const { ventana } = tomarVentana(textoNormalizado, match.index, match.index + termino.length);
 
         const materialInfo = buscarMaterial(ventana, materiales);
-        const componenteEncontrado = buscarComponente(ventana, componentes);
+        const componenteInfo = buscarComponente(ventana, componentes);
+        const materialFinal = resolverMaterialFinal(materialInfo, componenteInfo, materiales);
+        const estadoEncontrado = buscarEstado(ventana);
+        const agenteInfo = buscarAgenteExposicion(ventana);
+        const momentoExposicion = agenteInfo ? buscarMomentoExposicion(ventana, agenteInfo.posicion) : null;
         const origen = determinarOrigen(ventana);
+        const notaMaterialInferido = materialFinal.inferidoPorComponente
+          ? `Material inferido a partir del componente "${componenteInfo?.nombre}" (relación de tu catálogo)`
+          : null;
 
         registros.push({
           nombre_propiedad: atributo.nombre_es,
@@ -322,10 +436,13 @@ export function analizarPagina(
           sinonimos: [],
           categoria: 'Atributo/Cualidad',
           tipo_propiedad: 'Cualitativa',
-          familia_material: materialInfo.familia,
-          subfamilia_material: materialInfo.subfamilia,
-          material: materialInfo.material,
-          componente: componenteEncontrado,
+          familia_material: materialFinal.familia,
+          subfamilia_material: materialFinal.subfamilia,
+          material: materialFinal.material,
+          componente: componenteInfo ? componenteInfo.nombre : null,
+          estado_material: estadoEncontrado,
+          agente_exposicion: agenteInfo ? agenteInfo.nombre : null,
+          momento_exposicion: momentoExposicion,
           unidad: null,
           simbolo: null,
           valor_encontrado: null,
@@ -339,7 +456,7 @@ export function analizarPagina(
           relacion_otras_propiedades: atributo.propiedades_asociadas || null,
           nivel_confianza: 'Explícito',
           origen_dato: origen,
-          observaciones: atributo.definicion,
+          observaciones: [atributo.definicion, notaMaterialInferido].filter(Boolean).join(' | ') || null,
         });
       }
     }

@@ -23,6 +23,7 @@ export interface EntradaMaterial {
   sinonimos: string[];
   familia: string;
   subfamilia: string;
+  materialAsociado?: string | null; // solo lo usan los componentes: el material padre, vía id_material
 }
 
 // ── Entrada del diccionario de unidades ─────────────────────────
@@ -79,6 +80,9 @@ export interface PropiedadExtraida {
   subfamilia_material: string | null;
   material: string | null;
   componente: string | null;
+  estado_material: string | null;
+  agente_exposicion: string | null;
+  momento_exposicion: 'Antes' | 'Después' | null;
   unidad: string | null;
   simbolo: string | null;
   valor_encontrado: string | null;
