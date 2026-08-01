@@ -18,6 +18,47 @@ import {
 import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';
 import { cargarDiccionarioMateriales, cargarDiccionarioComponentes } from '../diccionarios/materiales';
 import { analizarPagina } from './motorExtraccion';
+import { extraerConocimientoConceptual, extraerReglasCausales } from './extractorConocimiento';
+import {
+extraerEspecificacionesDiseno,
+extraerReaccionesQuimicas,
+extraerHallazgosExperimentales,
+extraerDatosMercado,
+extraerTablasComparativas,
+} from './extractorAmpliado';
+import {
+extraerSignificado,
+extraerFuncion,
+extraerFactoresModificadores,
+extraerRelaciones,
+extraerProcesos,
+extraerAplicaciones,
+extraerVentajas,
+extraerLimitaciones,
+extraerIdentidadExtendida,
+extraerBibliografia,
+} from './extractorESP001';
+import { guardarConocimientoLote, guardarReglasLote } from '../../turso/guardarConocimiento';
+import {
+guardarEspecificacionesLote,
+guardarReaccionesLote,
+guardarHallazgosLote,
+guardarDatosMercadoLote,
+guardarTablasComparativasLote,
+} from '../../turso/guardarConocimientoAmpliado';
+import {
+guardarSignificadoLote,
+guardarFuncionLote,
+guardarFactoresModificadoresLote,
+guardarRelacionesLote,
+guardarProcesosLote,
+guardarAplicacionesLote,
+guardarVentajasLote,
+guardarLimitacionesLote,
+guardarIdentidadExtendidaLote,
+guardarBibliografiaLote,
+} from '../../turso/guardarConocimientoESP001';
+import { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso';
 import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';
 import { CheckpointNeurona, PropiedadExtraida, EntradaMaterial } from './tipos';
 
@@ -180,6 +221,46 @@ export abstract class NeuronExtraccionBase {
       if (capituloDetectado) capituloActual = capituloDetectado;
 
       const { registros, candidatos } = analizarPagina(texto, materiales, componentes);
+      const conocimientoCandidato = extraerConocimientoConceptual(texto,
+materiales);
+const reglasCandidatas = extraerReglasCausales(texto);
+const especificaciones = extraerEspecificacionesDiseno(texto, materiales);
+const reacciones = extraerReaccionesQuimicas(texto, materiales);
+const hallazgos = extraerHallazgosExperimentales(texto, materiales);
+const datosMercado = extraerDatosMercado(texto, materiales);
+const tablasComparativas = extraerTablasComparativas(texto, materiales);
+await guardarConocimientoLote(archivo.nombre, pagina, conocimientoCandidato);
+await guardarReglasLote(archivo.nombre, pagina, reglasCandidatas);
+await guardarEspecificacionesLote(archivo.nombre, pagina, especificaciones);
+await guardarReaccionesLote(archivo.nombre, pagina, reacciones);
+await guardarHallazgosLote(archivo.nombre, pagina, hallazgos);
+await guardarDatosMercadoLote(archivo.nombre, pagina, datosMercado);
+await guardarTablasComparativasLote(archivo.nombre, pagina,
+tablasComparativas);
+
+// -- ESP-001: 10 categorías nuevas (significado, función, factores,
+// relaciones, procesos, aplicaciones, ventajas, limitaciones,
+// identidad extendida, bibliografía) --
+const significado = extraerSignificado(texto, materiales);
+const funcion = extraerFuncion(texto, materiales);
+const factoresModificadores = extraerFactoresModificadores(texto, materiales);
+const relaciones = extraerRelaciones(texto, materiales);
+const procesos = extraerProcesos(texto, materiales);
+const aplicaciones = extraerAplicaciones(texto, materiales);
+const ventajas = extraerVentajas(texto, materiales);
+const limitaciones = extraerLimitaciones(texto, materiales);
+const identidadExtendida = extraerIdentidadExtendida(texto, materiales);
+const bibliografia = extraerBibliografia(texto, materiales);
+await guardarSignificadoLote(archivo.nombre, pagina, significado);
+await guardarFuncionLote(archivo.nombre, pagina, funcion);
+await guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores);
+await guardarRelacionesLote(archivo.nombre, pagina, relaciones);
+await guardarProcesosLote(archivo.nombre, pagina, procesos);
+await guardarAplicacionesLote(archivo.nombre, pagina, aplicaciones);
+await guardarVentajasLote(archivo.nombre, pagina, ventajas);
+await guardarLimitacionesLote(archivo.nombre, pagina, limitaciones);
+await guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida);
+await guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);
 
       for (const r of registros) {
         registrosPendientes.push({
@@ -198,6 +279,7 @@ export abstract class NeuronExtraccionBase {
       // Guardar en lotes de 50, o al terminar el documento
       if (registrosPendientes.length >= 50) {
         await guardarLote(registrosPendientes);
+        await guardarLotePropiedadesTurso(registrosPendientes);
         registrosPendientes = [];
       }
 
@@ -206,6 +288,7 @@ export abstract class NeuronExtraccionBase {
 
     if (registrosPendientes.length > 0) {
       await guardarLote(registrosPendientes);
+      await guardarLotePropiedadesTurso(registrosPendientes);
     }
 
     // Documento terminado: se marca completo y se limpia el progreso parcial
