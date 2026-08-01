@@ -228,7 +228,34 @@ function buscarComponente(
   return null;
 }
 
-// ── Si no se encontró material directamente pero sí un componente
+// ── Componente NUEVO, no catalogado: cuando buscarComponente() no
+//    encuentra nada en el diccionario, probamos con frases típicas
+//    de composición ("compuesto por", "se compone de", "contiene",
+//    "formado por", "constituido por", "integrado por") seguidas de
+//    un término con mayúscula inicial o un nombre químico típico
+//    (óxido de..., silicato de..., carbonato de..., sulfato de...).
+//    Así el sistema no queda limitado a una lista fija. ────────────
+const FRASES_COMPOSICION = /\b(?:compuest[oa]\s+(?:por|de)|se\s+compone\s+de|formad[oa]\s+por|constituid[oa]\s+por|integrad[oa]\s+por|contiene)\b/i;
+
+function buscarComponentePorPatron(ventana: string): { nombre: string; materialAsociado: null } | null {
+  const match = FRASES_COMPOSICION.exec(ventana);
+  if (!match) return null;
+
+  const resto = ventana.slice(match.index + match[0].length, match.index + match[0].length + 120);
+  // Primer término candidato: nombre químico típico o palabra con
+  // mayúscula inicial, cortando en coma/punto/y/o "quien primero venga".
+  const candidato = resto.match(
+    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+de\s+[a-záéíóúñ]+){0,2}|(?:óxido|silicato|carbonato|sulfato|hidróxido|aluminato|cloruro|fluoruro)\s+de\s+[a-záéíóúñ]+)/i
+  );
+  if (!candidato) return null;
+
+  const nombre = candidato[0].trim();
+  if (nombre.length < 4) return null;
+
+  return { nombre, materialAsociado: null };
+}
+
+
 //    con material padre conocido (vía tu tabla real), lo usamos
 //    como material — así ningún dato queda "huérfano" solo porque
 //    el texto nombró el componente y no el material completo ────
@@ -337,7 +364,7 @@ export function analizarPagina(
         const norma = buscarNorma(ventana);
         const { instrumento, metodo } = buscarInstrumentoYMetodo(ventana);
         const materialInfo = buscarMaterial(ventana, materiales);
-        const componenteInfo = buscarComponente(ventana, componentes);
+        const componenteInfo = buscarComponente(ventana, componentes) || buscarComponentePorPatron(ventana);
         const materialFinal = resolverMaterialFinal(materialInfo, componenteInfo, materiales);
         const estadoEncontrado = buscarEstado(ventana);
         const agenteInfo = buscarAgenteExposicion(ventana);
@@ -420,7 +447,7 @@ export function analizarPagina(
         const { ventana } = tomarVentana(textoNormalizado, match.index, match.index + termino.length);
 
         const materialInfo = buscarMaterial(ventana, materiales);
-        const componenteInfo = buscarComponente(ventana, componentes);
+        const componenteInfo = buscarComponente(ventana, componentes) || buscarComponentePorPatron(ventana);
         const materialFinal = resolverMaterialFinal(materialInfo, componenteInfo, materiales);
         const estadoEncontrado = buscarEstado(ventana);
         const agenteInfo = buscarAgenteExposicion(ventana);

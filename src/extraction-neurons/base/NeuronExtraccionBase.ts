@@ -37,6 +37,7 @@ extraerVentajas,
 extraerLimitaciones,
 extraerIdentidadExtendida,
 extraerBibliografia,
+extraerEstadoNatural,
 } from './extractorESP001';
 import { guardarConocimientoLote, guardarReglasLote } from '../../turso/guardarConocimiento';
 import {
@@ -57,6 +58,7 @@ guardarVentajasLote,
 guardarLimitacionesLote,
 guardarIdentidadExtendidaLote,
 guardarBibliografiaLote,
+guardarEstadoNaturalLote,
 } from '../../turso/guardarConocimientoESP001';
 import { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso';
 import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';
@@ -251,6 +253,7 @@ const ventajas = extraerVentajas(texto, materiales);
 const limitaciones = extraerLimitaciones(texto, materiales);
 const identidadExtendida = extraerIdentidadExtendida(texto, materiales);
 const bibliografia = extraerBibliografia(texto, materiales);
+const estadoNatural = extraerEstadoNatural(texto, materiales);
 await guardarSignificadoLote(archivo.nombre, pagina, significado);
 await guardarFuncionLote(archivo.nombre, pagina, funcion);
 await guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores);
@@ -261,6 +264,7 @@ await guardarVentajasLote(archivo.nombre, pagina, ventajas);
 await guardarLimitacionesLote(archivo.nombre, pagina, limitaciones);
 await guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida);
 await guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);
+await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
 
       for (const r of registros) {
         registrosPendientes.push({
