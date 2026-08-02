@@ -62,6 +62,7 @@ guardarEstadoNaturalLote,
 } from '../../turso/guardarConocimientoESP001';
 import { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso';
 import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';
+import { guardarLoteComponentes } from '../supabase/guardarExtraccionComponentes';
 import { CheckpointNeurona, PropiedadExtraida, EntradaMaterial } from './tipos';
 
 const CARPETA_CHECKPOINTS = path.join(process.cwd(), 'checkpoints');
@@ -211,6 +212,7 @@ export abstract class NeuronExtraccionBase {
     let capituloActual: string | null = null;
     let totalHallazgos = 0;
     let registrosPendientes: PropiedadExtraida[] = [];
+    let registrosComponentesPendientes: PropiedadExtraida[] = [];
 
     for (let i = paginaInicial; i < paginas.length; i++) {
       const { pagina, texto } = paginas[i];
@@ -267,14 +269,19 @@ await guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);
 await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
 
       for (const r of registros) {
-        registrosPendientes.push({
+        const registroCompleto = {
           neurona_id: this.neuronId,
           documento: archivo.nombre,
           drive_file_id: archivo.id,
           pagina,
           capitulo: capituloActual,
           ...r,
-        });
+        };
+        if (registroCompleto.componente) {
+          registrosComponentesPendientes.push(registroCompleto);
+        } else {
+          registrosPendientes.push(registroCompleto);
+        }
       }
       totalHallazgos += registros.length;
 
@@ -286,6 +293,10 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
         await guardarLotePropiedadesTurso(registrosPendientes);
         registrosPendientes = [];
       }
+      if (registrosComponentesPendientes.length >= 50) {
+        await guardarLoteComponentes(registrosComponentesPendientes);
+        registrosComponentesPendientes = [];
+      }
 
       this.actualizarProgresoPagina(checkpoint, archivo.id, pagina);
     }
@@ -293,6 +304,9 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
     if (registrosPendientes.length > 0) {
       await guardarLote(registrosPendientes);
       await guardarLotePropiedadesTurso(registrosPendientes);
+    }
+    if (registrosComponentesPendientes.length > 0) {
+      await guardarLoteComponentes(registrosComponentesPendientes);
     }
 
     // Documento terminado: se marca completo y se limpia el progreso parcial
