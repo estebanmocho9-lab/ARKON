@@ -512,5 +512,49 @@ export function analizarPagina(
     }
   }
 
+  // ── Ampliación de la red: además de unidades catalogadas, agarramos
+  //    número + palabra corta que PARECE unidad (no está en el
+  //    diccionario) y no cayó en ninguna ventana ya cubierta — para
+  //    no perder datos con unidades que todavía no cargamos. ───────
+  {
+    const regexUnidadGenerica = /(-?\d{1,4}(?:[.,]\d{1,6})?)\s*([a-zA-Zµ°%][a-zA-Z°%/²³\.]{0,9})\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = regexUnidadGenerica.exec(textoNormalizado)) !== null) {
+      const yaCubierto = rangosCubiertos.some(([ini, fin]) => m!.index >= ini && m!.index <= fin);
+      if (yaCubierto) continue;
+      // Si la "unidad" ya es una conocida, la salteamos (ya la cubrió el loop de arriba)
+      const posibleUnidad = m[2].toLowerCase();
+      const yaConocida = UNIDADES.some(u => u.variantes_texto.some(v => v.toLowerCase() === posibleUnidad));
+      if (yaConocida) continue;
+
+      const inicioFrag = Math.max(0, m.index - 60);
+      const finFrag = Math.min(textoNormalizado.length, m.index + m[0].length + 60);
+      candidatos.push({
+        pagina: 0,
+        fragmento: textoNormalizado.substring(inicioFrag, finFrag).trim(),
+        numero: m[1],
+        unidadDetectada: `${m[2]} (no catalogada)`,
+      });
+    }
+  }
+
+  // ── Campos con forma "Etiqueta: valor" que no matchearon ninguna
+  //    propiedad conocida — típico de fichas técnicas y tablas ─────
+  {
+    const regexEtiquetaValor = /\b([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ ]{2,40}):\s*([^\n.;]{2,80})/g;
+    let m: RegExpExecArray | null;
+    while ((m = regexEtiquetaValor.exec(textoNormalizado)) !== null) {
+      const yaCubierto = rangosCubiertos.some(([ini, fin]) => m!.index >= ini && m!.index <= fin);
+      if (yaCubierto) continue;
+
+      candidatos.push({
+        pagina: 0,
+        fragmento: m[0].trim(),
+        numero: '',
+        unidadDetectada: `etiqueta: "${m[1].trim()}"`,
+      });
+    }
+  }
+
   return { registros, candidatos };
 }
