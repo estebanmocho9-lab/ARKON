@@ -19,11 +19,19 @@
 import { EntradaMaterial } from '../base/tipos';
 import { supabase } from '../../supabase/client';
 
+// ── Familias que por ahora NO nos interesa que las neuronas
+//    matcheen (piden mucho almacenamiento y no se usan todavía).
+//    Para volver a activarlas, alcanza con sacarlas de esta lista.
+export const FAMILIAS_EXCLUIDAS = ['metal'];
+const PALABRAS_METAL = ['acero', 'aluminio', 'cobre', 'bronce', 'latón', 'hierro', 'zinc', 'titanio', 'níquel', 'plomo', 'estaño', 'steel', 'aluminum', 'copper', 'iron'];
+
+function esMetalExcluido(entrada: { familia: string; nombre_es: string }): boolean {
+  if (FAMILIAS_EXCLUIDAS.includes((entrada.familia || '').toLowerCase())) return true;
+  return PALABRAS_METAL.some((p) => (entrada.nombre_es || '').toLowerCase().includes(p));
+}
+
 // ── Semilla genérica (familias de ciencia de materiales) ────────
 export const MATERIALES_SEMILLA: EntradaMaterial[] = [
-  { nombre_es: 'Acero', nombre_en: 'Steel', sinonimos: ['acero estructural', 'structural steel'], familia: 'Metal', subfamilia: 'Ferroso' },
-  { nombre_es: 'Aluminio', nombre_en: 'Aluminum', sinonimos: ['aleación de aluminio', 'aluminum alloy'], familia: 'Metal', subfamilia: 'No ferroso' },
-  { nombre_es: 'Cobre', nombre_en: 'Copper', sinonimos: [], familia: 'Metal', subfamilia: 'No ferroso' },
   { nombre_es: 'Polímero termoplástico', nombre_en: 'Thermoplastic', sinonimos: ['policarbonato', 'polycarbonate', 'PVC', 'polietileno', 'polyethylene'], familia: 'Polímero', subfamilia: 'Termoplástico' },
   { nombre_es: 'Polímero termoestable', nombre_en: 'Thermoset', sinonimos: ['resina epoxi', 'epoxy resin'], familia: 'Polímero', subfamilia: 'Termoestable' },
   { nombre_es: 'Cerámico técnico', nombre_en: 'Engineering ceramic', sinonimos: ['fine ceramics', 'cerámica técnica'], familia: 'Cerámico', subfamilia: 'Técnico' },
@@ -69,6 +77,7 @@ export async function cargarDiccionarioMateriales(): Promise<EntradaMaterial[]> 
         const nombre = primerValorPresente(fila, ['nombre', 'nombre_material', 'name']);
         const familia = primerValorPresente(fila, ['familia', 'tipo', 'family']) || 'Sin clasificar';
         if (!nombre) continue;
+        if (esMetalExcluido({ familia, nombre_es: nombre })) continue;
         combinado.push({
           nombre_es: nombre,
           nombre_en: nombre,
@@ -82,7 +91,7 @@ export async function cargarDiccionarioMateriales(): Promise<EntradaMaterial[]> 
     console.warn(`⚠️  Error consultando catalogo_materiales: ${err.message}`);
   }
 
-  return combinado;
+  return combinado.filter((m) => !esMetalExcluido(m));
 }
 
 // ── Lee componentes_materiales de tu Supabase, POR SEPARADO de

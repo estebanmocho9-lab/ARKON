@@ -64,6 +64,8 @@ import { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso
 import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';
 import { guardarLoteComponentes } from '../supabase/guardarExtraccionComponentes';
 import { guardarDatosSinClasificarLote } from '../supabase/guardarDatosSinClasificar';
+import { guardarLoteComponentesTurso } from '../../turso/guardarPropiedadesComponentesTurso';
+import { guardarDatosSinClasificarTurso } from '../../turso/guardarDatosSinClasificarTurso';
 import { CheckpointNeurona, PropiedadExtraida, EntradaMaterial } from './tipos';
 
 const CARPETA_CHECKPOINTS = path.join(process.cwd(), 'checkpoints');
@@ -288,6 +290,7 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
 
       this.registrarCandidatos(archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
       await guardarDatosSinClasificarLote(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
+      await guardarDatosSinClasificarTurso(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
 
       // Guardar en lotes de 50, o al terminar el documento
       if (registrosPendientes.length >= 50) {
@@ -297,6 +300,7 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
       }
       if (registrosComponentesPendientes.length >= 50) {
         await guardarLoteComponentes(registrosComponentesPendientes);
+        await guardarLoteComponentesTurso(registrosComponentesPendientes);
         registrosComponentesPendientes = [];
       }
 
@@ -309,6 +313,7 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
     }
     if (registrosComponentesPendientes.length > 0) {
       await guardarLoteComponentes(registrosComponentesPendientes);
+      await guardarLoteComponentesTurso(registrosComponentesPendientes);
     }
 
     // Documento terminado: se marca completo y se limpia el progreso parcial

@@ -25,6 +25,7 @@ import {
 } from '../diccionarios/patronesESP001';
 import { PatronAmpliado } from '../diccionarios/patronesAmpliados';
 import { materialMasCercano } from './extractorConocimiento';
+import { buscarEstadoNaturalPorMaterial } from '../diccionarios/estadoNaturalMateriales';
 import { EntradaMaterial } from './tipos';
 
 // --------------------------------------------
@@ -42,6 +43,7 @@ export interface VentajaPropiedad { material: string; tipo: string; contenido: s
 export interface LimitacionPropiedad { material: string; tipo: string; contenido: string; }
 export interface IdentidadExtendida { material: string; tipo: string; contenido: string; }
 export interface CitaBibliografica { material: string; tipo: string; contenido: string; }
+export interface EstadoNaturalPropiedad { material: string; estado_natural: string; }
 
 // --------------------------------------------
 // FUNCION GENERICA: aplica una lista de patrones, busca el
@@ -119,4 +121,35 @@ export function extraerIdentidadExtendida(texto: string, materiales: EntradaMate
 
 export function extraerBibliografia(texto: string, materiales: EntradaMaterial[]): CitaBibliografica[] {
   return extraerConPatrones(texto, PATRONES_BIBLIOGRAFIA, materiales).map(r => ({ material: r.material, tipo: r.categoria, contenido: r.contenido }));
+}
+
+// --------------------------------------------
+// ESTADO NATURAL: no depende de patrones de texto — cada vez que
+// se menciona un material que está en ESTADO_NATURAL_MATERIALES,
+// se emite su estado físico inherente (polvo, líquido, etc.), una
+// sola vez por material encontrado en la página.
+// --------------------------------------------
+
+function escaparRegexLocal(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function extraerEstadoNatural(texto: string, materiales: EntradaMaterial[]): EstadoNaturalPropiedad[] {
+  const resultados: EstadoNaturalPropiedad[] = [];
+  const yaEncontrados = new Set<string>();
+
+  for (const mat of materiales) {
+    const estadoNatural = buscarEstadoNaturalPorMaterial(mat.nombre_es);
+    if (!estadoNatural || yaEncontrados.has(mat.nombre_es)) continue;
+
+    const terminos = [mat.nombre_es, mat.nombre_en, ...(mat.sinonimos || [])].filter(Boolean);
+    const mencionado = terminos.some((t) => new RegExp(`\\b${escaparRegexLocal(t)}\\b`, 'i').test(texto));
+
+    if (mencionado) {
+      resultados.push({ material: mat.nombre_es, estado_natural: estadoNatural });
+      yaEncontrados.add(mat.nombre_es);
+    }
+  }
+
+  return resultados;
 }

@@ -41,6 +41,12 @@ export const ESTADOS: EntradaEstado[] = [
   { id: 'humedo', nombre_es: 'Húmedo', nombre_en: 'Wet / Moist', sinonimos: ['humedad ambiente'], categoria: 'humedad' },
   { id: 'saturado', nombre_es: 'Saturado', nombre_en: 'Saturated', sinonimos: ['saturado de agua', 'water-saturated'], categoria: 'humedad' },
   { id: 'sumergido', nombre_es: 'Sumergido', nombre_en: 'Submerged / Immersed', sinonimos: ['inmerso', 'inmersión'], categoria: 'humedad' },
+  { id: 'absorcion_agua', nombre_es: 'Absorción de agua', nombre_en: 'Water absorption', sinonimos: ['absorbe agua', 'capacidad de absorción', 'water uptake'], categoria: 'humedad' },
+  { id: 'higroscopico', nombre_es: 'Higroscópico', nombre_en: 'Hygroscopic', sinonimos: ['higroscopicidad', 'hygroscopicity'], categoria: 'humedad' },
+
+  // ── material seco que, al absorber agua o secarse, ejerce fuerza ──
+  { id: 'expansivo', nombre_es: 'Expansivo / Hinchamiento', nombre_en: 'Swelling / Expansive', sinonimos: ['expansión', 'hinchamiento', 'presión de hinchamiento', 'swelling pressure', 'expansión libre'], categoria: 'fisico' },
+  { id: 'contractivo', nombre_es: 'Contracción / Retracción', nombre_en: 'Shrinkage', sinonimos: ['retracción', 'contracción por secado', 'drying shrinkage'], categoria: 'fisico' },
 ];
 
 export function buscarEstadoPorId(id: string): EntradaEstado | undefined {

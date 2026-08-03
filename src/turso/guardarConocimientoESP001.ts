@@ -17,6 +17,7 @@ import {
   LimitacionPropiedad,
   IdentidadExtendida,
   CitaBibliografica,
+  EstadoNaturalPropiedad,
 } from '../extraction-neurons/base/extractorESP001';
 
 async function guardarGenerico(
@@ -78,4 +79,21 @@ export async function guardarIdentidadExtendidaLote(documento: string, pagina: n
 
 export async function guardarBibliografiaLote(documento: string, pagina: number, items: CitaBibliografica[]): Promise<void> {
   await guardarGenerico('bibliografia_propiedad', documento, pagina, items, 'cita bibliográfica');
+}
+
+// Estado natural tiene forma distinta (no tiene "tipo"/"contenido"),
+// así que usa su propia inserción en vez de guardarGenerico.
+export async function guardarEstadoNaturalLote(documento: string, pagina: number, items: EstadoNaturalPropiedad[]): Promise<void> {
+  for (const it of items) {
+    try {
+      await turso.execute({
+        sql: `INSERT INTO estado_natural_material
+              (material, estado_natural, documento, pagina, confianza, estado)
+              VALUES (?, ?, ?, ?, 0.6, 'pendiente')`,
+        args: [it.material, it.estado_natural, documento, pagina],
+      });
+    } catch (error) {
+      console.error('Error guardando estado natural:', error);
+    }
+  }
 }

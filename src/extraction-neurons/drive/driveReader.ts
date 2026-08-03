@@ -84,6 +84,45 @@ export async function listarPDFs(carpetaId: string): Promise<ArchivoDrive[]> {
   return archivos;
 }
 
+// ── Lista TODO lo que hay en una carpeta (no solo PDFs), con
+//    tamaño y tipo — para diagnóstico, no la usa el flujo normal
+//    de extracción (que sigue usando listarPDFs de arriba) ───────
+export interface ArchivoDriveCompleto {
+  id: string;
+  nombre: string;
+  mimeType: string;
+  tamanoMB: number;
+}
+
+export async function listarTodosLosArchivos(carpetaId: string): Promise<ArchivoDriveCompleto[]> {
+  const archivos: ArchivoDriveCompleto[] = [];
+  let pageToken: string | undefined = undefined;
+
+  do {
+    const res: any = await drive.files.list({
+      q: `'${carpetaId}' in parents and trashed=false`,
+      fields: 'nextPageToken, files(id, name, mimeType, size)',
+      pageSize: 200,
+      pageToken,
+      orderBy: 'name',
+    });
+
+    for (const f of res.data.files || []) {
+      if (f.id && f.name) {
+        archivos.push({
+          id: f.id,
+          nombre: f.name,
+          mimeType: f.mimeType || 'desconocido',
+          tamanoMB: f.size ? Math.round((Number(f.size) / (1024 * 1024)) * 100) / 100 : 0,
+        });
+      }
+    }
+    pageToken = res.data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return archivos;
+}
+
 // ── Descarga un archivo puntual a memoria (Buffer), sin dejar
 //    copia en disco ─────────────────────────────────────────────
 export async function descargarArchivo(archivoId: string): Promise<Buffer> {
