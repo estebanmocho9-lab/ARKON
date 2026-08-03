@@ -236,14 +236,15 @@ const reacciones = extraerReaccionesQuimicas(texto, materiales);
 const hallazgos = extraerHallazgosExperimentales(texto, materiales);
 const datosMercado = extraerDatosMercado(texto, materiales);
 const tablasComparativas = extraerTablasComparativas(texto, materiales);
-await guardarConocimientoLote(archivo.nombre, pagina, conocimientoCandidato);
-await guardarReglasLote(archivo.nombre, pagina, reglasCandidatas);
-await guardarEspecificacionesLote(archivo.nombre, pagina, especificaciones);
-await guardarReaccionesLote(archivo.nombre, pagina, reacciones);
-await guardarHallazgosLote(archivo.nombre, pagina, hallazgos);
-await guardarDatosMercadoLote(archivo.nombre, pagina, datosMercado);
-await guardarTablasComparativasLote(archivo.nombre, pagina,
-tablasComparativas);
+await Promise.all([
+  guardarConocimientoLote(archivo.nombre, pagina, conocimientoCandidato),
+  guardarReglasLote(archivo.nombre, pagina, reglasCandidatas),
+  guardarEspecificacionesLote(archivo.nombre, pagina, especificaciones),
+  guardarReaccionesLote(archivo.nombre, pagina, reacciones),
+  guardarHallazgosLote(archivo.nombre, pagina, hallazgos),
+  guardarDatosMercadoLote(archivo.nombre, pagina, datosMercado),
+  guardarTablasComparativasLote(archivo.nombre, pagina, tablasComparativas),
+]);
 
 // -- ESP-001: 10 categorías nuevas (significado, función, factores,
 // relaciones, procesos, aplicaciones, ventajas, limitaciones,
@@ -259,17 +260,19 @@ const limitaciones = extraerLimitaciones(texto, materiales);
 const identidadExtendida = extraerIdentidadExtendida(texto, materiales);
 const bibliografia = extraerBibliografia(texto, materiales);
 const estadoNatural = extraerEstadoNatural(texto, materiales);
-await guardarSignificadoLote(archivo.nombre, pagina, significado);
-await guardarFuncionLote(archivo.nombre, pagina, funcion);
-await guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores);
-await guardarRelacionesLote(archivo.nombre, pagina, relaciones);
-await guardarProcesosLote(archivo.nombre, pagina, procesos);
-await guardarAplicacionesLote(archivo.nombre, pagina, aplicaciones);
-await guardarVentajasLote(archivo.nombre, pagina, ventajas);
-await guardarLimitacionesLote(archivo.nombre, pagina, limitaciones);
-await guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida);
-await guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);
-await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
+await Promise.all([
+  guardarSignificadoLote(archivo.nombre, pagina, significado),
+  guardarFuncionLote(archivo.nombre, pagina, funcion),
+  guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores),
+  guardarRelacionesLote(archivo.nombre, pagina, relaciones),
+  guardarProcesosLote(archivo.nombre, pagina, procesos),
+  guardarAplicacionesLote(archivo.nombre, pagina, aplicaciones),
+  guardarVentajasLote(archivo.nombre, pagina, ventajas),
+  guardarLimitacionesLote(archivo.nombre, pagina, limitaciones),
+  guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida),
+  guardarBibliografiaLote(archivo.nombre, pagina, bibliografia),
+  guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural),
+]);
 
       for (const r of registros) {
         const registroCompleto = {
@@ -289,18 +292,24 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
       totalHallazgos += registros.length;
 
       this.registrarCandidatos(archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
-      await guardarDatosSinClasificarLote(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
-      await guardarDatosSinClasificarTurso(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina })));
+      await Promise.all([
+        guardarDatosSinClasificarLote(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina }))),
+        guardarDatosSinClasificarTurso(this.neuronId, archivo.nombre, candidatos.map(c => ({ ...c, pagina }))),
+      ]);
 
       // Guardar en lotes de 50, o al terminar el documento
       if (registrosPendientes.length >= 50) {
-        await guardarLote(registrosPendientes);
-        await guardarLotePropiedadesTurso(registrosPendientes);
+        await Promise.all([
+          guardarLote(registrosPendientes),
+          guardarLotePropiedadesTurso(registrosPendientes),
+        ]);
         registrosPendientes = [];
       }
       if (registrosComponentesPendientes.length >= 50) {
-        await guardarLoteComponentes(registrosComponentesPendientes);
-        await guardarLoteComponentesTurso(registrosComponentesPendientes);
+        await Promise.all([
+          guardarLoteComponentes(registrosComponentesPendientes),
+          guardarLoteComponentesTurso(registrosComponentesPendientes),
+        ]);
         registrosComponentesPendientes = [];
       }
 
@@ -308,12 +317,16 @@ await guardarEstadoNaturalLote(archivo.nombre, pagina, estadoNatural);
     }
 
     if (registrosPendientes.length > 0) {
-      await guardarLote(registrosPendientes);
-      await guardarLotePropiedadesTurso(registrosPendientes);
+      await Promise.all([
+        guardarLote(registrosPendientes),
+        guardarLotePropiedadesTurso(registrosPendientes),
+      ]);
     }
     if (registrosComponentesPendientes.length > 0) {
-      await guardarLoteComponentes(registrosComponentesPendientes);
-      await guardarLoteComponentesTurso(registrosComponentesPendientes);
+      await Promise.all([
+        guardarLoteComponentes(registrosComponentesPendientes),
+        guardarLoteComponentesTurso(registrosComponentesPendientes),
+      ]);
     }
 
     // Documento terminado: se marca completo y se limpia el progreso parcial

@@ -27,17 +27,19 @@ async function guardarGenerico(
   items: { material: string; tipo: string; contenido: string }[],
   etiquetaError: string
 ): Promise<void> {
-  for (const it of items) {
-    try {
-      await turso.execute({
+  if (items.length === 0) return;
+  try {
+    await turso.batch(
+      items.map((it) => ({
         sql: `INSERT INTO ${tabla}
               (material, tipo, contenido, documento, pagina, confianza, estado)
               VALUES (?, ?, ?, ?, ?, 0.6, 'pendiente')`,
         args: [it.material, it.tipo, it.contenido, documento, pagina],
-      });
-    } catch (error) {
-      console.error(`Error guardando ${etiquetaError}:`, error);
-    }
+      })),
+      'write'
+    );
+  } catch (error) {
+    console.error(`Error guardando lote de ${etiquetaError}:`, error);
   }
 }
 
@@ -84,16 +86,18 @@ export async function guardarBibliografiaLote(documento: string, pagina: number,
 // Estado natural tiene forma distinta (no tiene "tipo"/"contenido"),
 // así que usa su propia inserción en vez de guardarGenerico.
 export async function guardarEstadoNaturalLote(documento: string, pagina: number, items: EstadoNaturalPropiedad[]): Promise<void> {
-  for (const it of items) {
-    try {
-      await turso.execute({
+  if (items.length === 0) return;
+  try {
+    await turso.batch(
+      items.map((it) => ({
         sql: `INSERT INTO estado_natural_material
               (material, estado_natural, documento, pagina, confianza, estado)
               VALUES (?, ?, ?, ?, 0.6, 'pendiente')`,
         args: [it.material, it.estado_natural, documento, pagina],
-      });
-    } catch (error) {
-      console.error('Error guardando estado natural:', error);
-    }
+      })),
+      'write'
+    );
+  } catch (error) {
+    console.error('Error guardando lote de estado natural:', error);
   }
 }

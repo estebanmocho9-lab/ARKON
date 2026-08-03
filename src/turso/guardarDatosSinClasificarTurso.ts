@@ -7,6 +7,13 @@
 import { turso } from './tursoClient';
 import { DatoSinClasificar } from '../extraction-neurons/supabase/guardarDatosSinClasificar';
 
+function sanitizarTexto(valor: string | null): string | null {
+  if (valor == null) return valor;
+  return valor
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '');
+}
+
 export async function guardarDatosSinClasificarTurso(
   neuronaId: string,
   documento: string,
@@ -14,16 +21,24 @@ export async function guardarDatosSinClasificarTurso(
 ): Promise<void> {
   if (datos.length === 0) return;
 
-  for (const d of datos) {
-    try {
-      await turso.execute({
+  try {
+    await turso.batch(
+      datos.map((d) => ({
         sql: `INSERT INTO datos_sin_clasificar
               (neurona_id, documento, pagina, fragmento, numero, unidad_o_etiqueta, revisado)
               VALUES (?, ?, ?, ?, ?, ?, 0)`,
-        args: [neuronaId, documento, d.pagina, d.fragmento, d.numero || null, d.unidadDetectada],
-      });
-    } catch (error) {
-      console.error('Error guardando dato sin clasificar en Turso:', error);
-    }
+        args: [
+          neuronaId,
+          documento,
+          d.pagina,
+          sanitizarTexto(d.fragmento),
+          sanitizarTexto(d.numero) || null,
+          sanitizarTexto(d.unidadDetectada),
+        ],
+      })),
+      'write'
+    );
+  } catch (error) {
+    console.error('Error guardando lote de datos sin clasificar en Turso:', error);
   }
 }

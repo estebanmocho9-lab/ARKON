@@ -519,7 +519,10 @@ export function analizarPagina(
   {
     const regexUnidadGenerica = /(-?\d{1,4}(?:[.,]\d{1,6})?)\s*([a-zA-Zµ°%][a-zA-Z°%/²³\.]{0,9})\b/g;
     let m: RegExpExecArray | null;
+    const TOPE_UNIDAD_GENERICA = 25;
+    let contadorUnidadGenerica = 0;
     while ((m = regexUnidadGenerica.exec(textoNormalizado)) !== null) {
+      if (contadorUnidadGenerica >= TOPE_UNIDAD_GENERICA) break;
       const yaCubierto = rangosCubiertos.some(([ini, fin]) => m!.index >= ini && m!.index <= fin);
       if (yaCubierto) continue;
       // Si la "unidad" ya es una conocida, la salteamos (ya la cubrió el loop de arriba)
@@ -535,6 +538,7 @@ export function analizarPagina(
         numero: m[1],
         unidadDetectada: `${m[2]} (no catalogada)`,
       });
+      contadorUnidadGenerica++;
     }
   }
 
@@ -543,7 +547,10 @@ export function analizarPagina(
   {
     const regexEtiquetaValor = /\b([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ ]{2,40}):\s*([^\n.;]{2,80})/g;
     let m: RegExpExecArray | null;
+    const TOPE_ETIQUETA_VALOR = 25;
+    let contadorEtiquetaValor = 0;
     while ((m = regexEtiquetaValor.exec(textoNormalizado)) !== null) {
+      if (contadorEtiquetaValor >= TOPE_ETIQUETA_VALOR) break;
       const yaCubierto = rangosCubiertos.some(([ini, fin]) => m!.index >= ini && m!.index <= fin);
       if (yaCubierto) continue;
 
@@ -553,6 +560,7 @@ export function analizarPagina(
         numero: '',
         unidadDetectada: `etiqueta: "${m[1].trim()}"`,
       });
+      contadorEtiquetaValor++;
     }
   }
 

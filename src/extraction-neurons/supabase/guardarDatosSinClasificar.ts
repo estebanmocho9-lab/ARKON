@@ -17,6 +17,13 @@ export interface DatoSinClasificar {
   unidadDetectada: string;
 }
 
+function sanitizarTexto(valor: string | null): string | null {
+  if (valor == null) return valor;
+  return valor
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '');
+}
+
 export async function guardarDatosSinClasificarLote(
   neuronaId: string,
   documento: string,
@@ -30,9 +37,9 @@ export async function guardarDatosSinClasificarLote(
       neurona_id: neuronaId,
       documento,
       pagina: d.pagina,
-      fragmento: d.fragmento,
-      numero: d.numero || null,
-      unidad_o_etiqueta: d.unidadDetectada,
+      fragmento: sanitizarTexto(d.fragmento),
+      numero: sanitizarTexto(d.numero) || null,
+      unidad_o_etiqueta: sanitizarTexto(d.unidadDetectada),
       revisado: false,
     }));
     const { error } = await supabase.from('datos_sin_clasificar').insert(lote);

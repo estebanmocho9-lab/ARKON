@@ -14,9 +14,9 @@ export async function guardarLoteComponentesTurso(
 ): Promise<void> {
   if (registros.length === 0) return;
 
-  for (const r of registros) {
-    try {
-      await turso.execute({
+  try {
+    await turso.batch(
+      registros.map((r) => ({
         sql: `INSERT INTO propiedades_componentes (
                 neurona_id, documento, drive_file_id, pagina, capitulo,
                 nombre_propiedad, nombre_ingles, sinonimos, categoria, tipo_propiedad,
@@ -35,9 +35,10 @@ export async function guardarLoteComponentesTurso(
           r.ecuacion_formula, r.relacion_otras_propiedades, r.nivel_confianza,
           r.origen_dato, r.observaciones,
         ],
-      });
-    } catch (error) {
-      console.error('Error guardando propiedad de componente en Turso:', error);
-    }
+      })),
+      'write'
+    );
+  } catch (error) {
+    console.error('Error guardando lote de propiedades de componente en Turso:', error);
   }
 }
