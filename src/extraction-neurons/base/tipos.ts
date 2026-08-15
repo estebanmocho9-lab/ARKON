@@ -97,6 +97,12 @@ export interface PropiedadExtraida {
   nivel_confianza: 'Explícito' | 'Inferido';
   origen_dato: 'Tabla' | 'Texto' | 'Gráfico';
   observaciones: string | null;
+  // ~200 caracteres reales del documento, centrados entre la
+  // propiedad y el valor que se emparejaron para armar este
+  // registro — para auditar casos dudosos sin reabrir el PDF.
+  // Opcional (?) para no romper ningún otro lugar del código que
+  // arme un PropiedadExtraida sin este campo todavía.
+  fragmento_texto?: string | null;
 }
 
 // ── Checkpoint local por neurona (para reanudar) ────────────────

@@ -111,8 +111,8 @@ import { N088_ContenidoAlumina } from './inverse/N088_contenido_alumina';
 import { N089_ContenidoFerrico } from './inverse/N089_contenido_ferrico';
 import { N090_CalLibre } from './inverse/N090_cal_libre';
 import { N091_Magnesia } from './inverse/N091_magnesia';
-import { N092_Sosa } from './inverse/N092_sosa';
-import { N093_Potasa } from './inverse/N093_potasa';
+import { N092_ViscosidadFundidoSodico } from './inverse/N092_sosa';
+import { N093_ViscosidadFundidoPotasico } from './inverse/N093_potasa';
 // Grupo superficie
 import { N094_EstabilidadCohesiva } from './inverse/N094_estabilidad_cohesiva';
 import { N095_CosenoAngulo } from './inverse/N095_coseno_angulo';
@@ -218,8 +218,8 @@ export const ALL_NEURONS: NeuronBase[] = [
   new N089_ContenidoFerrico(),
   new N090_CalLibre(),
   new N091_Magnesia(),
-  new N092_Sosa(),
-  new N093_Potasa(),
+  new N092_ViscosidadFundidoSodico(),
+  new N093_ViscosidadFundidoPotasico(),
   new N094_EstabilidadCohesiva(),
   new N095_CosenoAngulo(),
   new N096_TrabajoCohesion(),

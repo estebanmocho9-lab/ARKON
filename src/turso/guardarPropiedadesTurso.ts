@@ -23,8 +23,8 @@ export async function guardarLotePropiedadesTurso(
                 unidad, simbolo, valor_encontrado, valor_minimo, valor_maximo,
                 condicion_ensayo, metodo_ensayo, instrumento_usado, norma,
                 ecuacion_formula, relacion_otras_propiedades, nivel_confianza,
-                origen_dato, observaciones
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                origen_dato, observaciones, fragmento_texto
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           r.neurona_id, r.documento, r.drive_file_id, r.pagina, r.capitulo,
           r.nombre_propiedad, r.nombre_ingles, JSON.stringify(r.sinonimos), r.categoria, r.tipo_propiedad,
@@ -32,7 +32,7 @@ export async function guardarLotePropiedadesTurso(
           r.unidad, r.simbolo, r.valor_encontrado, r.valor_minimo, r.valor_maximo,
           r.condicion_ensayo, r.metodo_ensayo, r.instrumento_usado, r.norma,
           r.ecuacion_formula, r.relacion_otras_propiedades, r.nivel_confianza,
-          r.origen_dato, r.observaciones,
+          r.origen_dato, r.observaciones, r.fragmento_texto ?? null,
         ],
       })),
       'write'

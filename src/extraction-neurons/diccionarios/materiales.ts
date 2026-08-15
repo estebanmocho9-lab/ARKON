@@ -19,36 +19,20 @@
 import { EntradaMaterial } from '../base/tipos';
 import { supabase } from '../../supabase/client';
 
-// ── Familias que por ahora NO nos interesa que las neuronas
-//    matcheen (piden mucho almacenamiento y no se usan todavía).
-//    Para volver a activarlas, alcanza con sacarlas de esta lista.
-export const FAMILIAS_EXCLUIDAS = ['metal'];
-const PALABRAS_METAL = ['acero', 'aluminio', 'cobre', 'bronce', 'latón', 'hierro', 'zinc', 'titanio', 'níquel', 'plomo', 'estaño', 'steel', 'aluminum', 'copper', 'iron'];
-
-function esMetalExcluido(entrada: { familia: string; nombre_es: string }): boolean {
-  if (FAMILIAS_EXCLUIDAS.includes((entrada.familia || '').toLowerCase())) return true;
-  return PALABRAS_METAL.some((p) => (entrada.nombre_es || '').toLowerCase().includes(p));
-}
-
-// ── Semilla genérica (familias de ciencia de materiales) ────────
-export const MATERIALES_SEMILLA: EntradaMaterial[] = [
-  { nombre_es: 'Polímero termoplástico', nombre_en: 'Thermoplastic', sinonimos: ['policarbonato', 'polycarbonate', 'PVC', 'polietileno', 'polyethylene'], familia: 'Polímero', subfamilia: 'Termoplástico' },
-  { nombre_es: 'Polímero termoestable', nombre_en: 'Thermoset', sinonimos: ['resina epoxi', 'epoxy resin'], familia: 'Polímero', subfamilia: 'Termoestable' },
-  { nombre_es: 'Cerámico técnico', nombre_en: 'Engineering ceramic', sinonimos: ['fine ceramics', 'cerámica técnica'], familia: 'Cerámico', subfamilia: 'Técnico' },
-  { nombre_es: 'Cerámico poroso', nombre_en: 'Porous ceramic', sinonimos: ['ladrillo', 'brick', 'hormigón', 'concrete', 'piedra arenisca', 'sandstone'], familia: 'Cerámico', subfamilia: 'Poroso' },
-  { nombre_es: 'Yeso', nombre_en: 'Gypsum', sinonimos: ['gypsum board', 'placa de yeso', 'sulfato de calcio hidratado'], familia: 'Cerámico', subfamilia: 'Yeso y derivados' },
-  { nombre_es: 'Cal', nombre_en: 'Lime', sinonimos: ['cal hidratada', 'hydrated lime', 'cal aérea', 'cal hidráulica'], familia: 'Cerámico', subfamilia: 'Conglomerante' },
-  { nombre_es: 'Cemento', nombre_en: 'Cement', sinonimos: ['cemento Portland', 'Portland cement'], familia: 'Cerámico', subfamilia: 'Conglomerante' },
-  { nombre_es: 'Arcilla', nombre_en: 'Clay', sinonimos: [], familia: 'Cerámico', subfamilia: 'Arcilloso' },
-  { nombre_es: 'Vidrio', nombre_en: 'Glass', sinonimos: ['silicato'], familia: 'Vidrio', subfamilia: 'Silicato' },
-  { nombre_es: 'Madera', nombre_en: 'Wood', sinonimos: ['abeto', 'spruce', 'madera de pino', 'pine wood'], familia: 'Natural', subfamilia: 'Madera' },
-  { nombre_es: 'Elastómero', nombre_en: 'Elastomer', sinonimos: ['caucho', 'rubber'], familia: 'Elastómero', subfamilia: 'Natural / Artificial' },
-  { nombre_es: 'Espuma polimérica', nombre_en: 'Polymer foam', sinonimos: ['espuma', 'foam'], familia: 'Híbrido', subfamilia: 'Espuma' },
-  { nombre_es: 'Compuesto CFRP', nombre_en: 'CFRP composite', sinonimos: ['fibra de carbono', 'carbon fiber reinforced'], familia: 'Híbrido', subfamilia: 'Compuesto' },
-  { nombre_es: 'Compuesto GFRP', nombre_en: 'GFRP composite', sinonimos: ['fibra de vidrio', 'glass fiber reinforced'], familia: 'Híbrido', subfamilia: 'Compuesto' },
-  { nombre_es: 'Granito', nombre_en: 'Granite', sinonimos: [], familia: 'Cerámico', subfamilia: 'Roca natural' },
-  { nombre_es: 'Arena', nombre_en: 'Sand', sinonimos: [], familia: 'Natural', subfamilia: 'Árido' },
-];
+// ── Semilla genérica de materiales de referencia (fuera de tu
+//    catálogo). DESACTIVADA — se estaba superponiendo con tus 21
+//    materiales reales y generando ruido en la extracción (Acero,
+//    Arena, Aluminio, Yeso genérico, Cal genérica, etc. no son
+//    parte de tu catálogo y NO deben aparecer en ningún registro).
+//    Los ÚNICOS materiales que debe reconocer el sistema son los
+//    21 que están cargados en catalogo_materiales de Supabase:
+//    Talco Industrial, Cemento Portland, Arcilla Expandida, Cal
+//    Hidráulica, Perlita Expandida, Bentonita Sódica, Vermiculita,
+//    Humo de Sílice, Vidrio Molido, Yeso Molido, Resina Epoxi,
+//    Resina Poliéster, Tiza Molida, Fibra de Vidrio, Cartón
+//    Triturado, Queratina, Piedra Pómez, Bagazo de Caña, Carbón
+//    Activado, Ocre Rojo, Ocre Amarillo — y nada más que esos 21.
+export const MATERIALES_SEMILLA: EntradaMaterial[] = [];
 
 // ── Toma el primer valor presente entre varias claves candidatas ─
 function primerValorPresente(obj: any, claves: string[]): string | null {
@@ -75,13 +59,13 @@ export async function cargarDiccionarioMateriales(): Promise<EntradaMaterial[]> 
     } else {
       for (const fila of catalogo || []) {
         const nombre = primerValorPresente(fila, ['nombre', 'nombre_material', 'name']);
-        const familia = primerValorPresente(fila, ['familia', 'tipo', 'family']) || 'Sin clasificar';
         if (!nombre) continue;
-        if (esMetalExcluido({ familia, nombre_es: nombre })) continue;
+        const nombreIngles = primerValorPresente(fila, ['nombre_en', 'nombre_ingles', 'name_en']) || nombre;
+        const familia = primerValorPresente(fila, ['familia', 'tipo', 'family']) || 'Sin clasificar';
         combinado.push({
           nombre_es: nombre,
-          nombre_en: nombre,
-          sinonimos: [],
+          nombre_en: nombreIngles,
+          sinonimos: Array.isArray(fila.sinonimos) ? fila.sinonimos : [],
           familia,
           subfamilia: primerValorPresente(fila, ['subfamilia', 'subfamily']) || '',
         });
@@ -91,7 +75,7 @@ export async function cargarDiccionarioMateriales(): Promise<EntradaMaterial[]> 
     console.warn(`⚠️  Error consultando catalogo_materiales: ${err.message}`);
   }
 
-  return combinado.filter((m) => !esMetalExcluido(m));
+  return combinado;
 }
 
 // ── Lee componentes_materiales de tu Supabase, POR SEPARADO de

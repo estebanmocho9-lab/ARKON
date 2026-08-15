@@ -1,0 +1,230 @@
+[1mdiff --git a/src/extraction-neurons/base/NeuronExtraccionBase.ts b/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[1mindex fd84f6d..4733ec2 100644[m
+[1m--- a/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[1m+++ b/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[36m@@ -18,6 +18,47 @@[m [mimport {[m
+ import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';[m
+ import { cargarDiccionarioMateriales, cargarDiccionarioComponentes } from '../diccionarios/materiales';[m
+ import { analizarPagina } from './motorExtraccion';[m
+[32m+[m[32mimport { extraerConocimientoConceptual, extraerReglasCausales } from './extractorConocimiento';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mextraerEspecificacionesDiseno,[m
+[32m+[m[32mextraerReaccionesQuimicas,[m
+[32m+[m[32mextraerHallazgosExperimentales,[m
+[32m+[m[32mextraerDatosMercado,[m
+[32m+[m[32mextraerTablasComparativas,[m
+[32m+[m[32m} from './extractorAmpliado';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mextraerSignificado,[m
+[32m+[m[32mextraerFuncion,[m
+[32m+[m[32mextraerFactoresModificadores,[m
+[32m+[m[32mextraerRelaciones,[m
+[32m+[m[32mextraerProcesos,[m
+[32m+[m[32mextraerAplicaciones,[m
+[32m+[m[32mextraerVentajas,[m
+[32m+[m[32mextraerLimitaciones,[m
+[32m+[m[32mextraerIdentidadExtendida,[m
+[32m+[m[32mextraerBibliografia,[m
+[32m+[m[32m} from './extractorESP001';[m
+[32m+[m[32mimport { guardarConocimientoLote, guardarReglasLote } from '../../turso/guardarConocimiento';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mguardarEspecificacionesLote,[m
+[32m+[m[32mguardarReaccionesLote,[m
+[32m+[m[32mguardarHallazgosLote,[m
+[32m+[m[32mguardarDatosMercadoLote,[m
+[32m+[m[32mguardarTablasComparativasLote,[m
+[32m+[m[32m} from '../../turso/guardarConocimientoAmpliado';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mguardarSignificadoLote,[m
+[32m+[m[32mguardarFuncionLote,[m
+[32m+[m[32mguardarFactoresModificadoresLote,[m
+[32m+[m[32mguardarRelacionesLote,[m
+[32m+[m[32mguardarProcesosLote,[m
+[32m+[m[32mguardarAplicacionesLote,[m
+[32m+[m[32mguardarVentajasLote,[m
+[32m+[m[32mguardarLimitacionesLote,[m
+[32m+[m[32mguardarIdentidadExtendidaLote,[m
+[32m+[m[32mguardarBibliografiaLote,[m
+[32m+[m[32m} from '../../turso/guardarConocimientoESP001';[m
+[32m+[m[32mimport { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso';[m
+ import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';[m
+ import { CheckpointNeurona, PropiedadExtraida, EntradaMaterial } from './tipos';[m
+ [m
+[36m@@ -180,6 +221,46 @@[m [mexport abstract class NeuronExtraccionBase {[m
+       if (capituloDetectado) capituloActual = capituloDetectado;[m
+ [m
+       const { registros, candidatos } = analizarPagina(texto, materiales, componentes);[m
+[32m+[m[32m      const conocimientoCandidato = extraerConocimientoConceptual(texto,[m
+[32m+[m[32mmateriales);[m
+[32m+[m[32mconst reglasCandidatas = extraerReglasCausales(texto);[m
+[32m+[m[32mconst especificaciones = extraerEspecificacionesDiseno(texto, materiales);[m
+[32m+[m[32mconst reacciones = extraerReaccionesQuimicas(texto, materiales);[m
+[32m+[m[32mconst hallazgos = extraerHallazgosExperimentales(texto, materiales);[m
+[32m+[m[32mconst datosMercado = extraerDatosMercado(texto, materiales);[m
+[32m+[m[32mconst tablasComparativas = extraerTablasComparativas(texto, materiales);[m
+[32m+[m[32mawait guardarConocimientoLote(archivo.nombre, pagina, conocimientoCandidato);[m
+[32m+[m[32mawait guardarReglasLote(archivo.nombre, pagina, reglasCandidatas);[m
+[32m+[m[32mawait guardarEspecificacionesLote(archivo.nombre, pagina, especificaciones);[m
+[32m+[m[32mawait guardarReaccionesLote(archivo.nombre, pagina, reacciones);[m
+[32m+[m[32mawait guardarHallazgosLote(archivo.nombre, pagina, hallazgos);[m
+[32m+[m[32mawait guardarDatosMercadoLote(archivo.nombre, pagina, datosMercado);[m
+[32m+[m[32mawait guardarTablasComparativasLote(archivo.nombre, pagina,[m
+[32m+[m[32mtablasComparativas);[m
+[32m+[m
+[32m+[m[32m// -- ESP-001: 10 categorías nuevas (significado, función, factores,[m
+[32m+[m[32m// relaciones, procesos, aplicaciones, ventajas, limitaciones,[m
+[32m+[m[32m// identidad extendida, bibliografía) --[m
+[32m+[m[32mconst significado = extraerSignificado(texto, materiales);[m
+[32m+[m[32mconst funcion = extraerFuncion(texto, materiales);[m
+[32m+[m[32mconst factoresModificadores = extraerFactoresModificadores(texto, materiales);[m
+[32m+[m[32mconst relaciones = extraerRelaciones(texto, materiales);[m
+[32m+[m[32mconst procesos = extraerProcesos(texto, materiales);[m
+[32m+[m[32mconst aplicaciones = extraerAplicaciones(texto, materiales);[m
+[32m+[m[32mconst ventajas = extraerVentajas(texto, materiales);[m
+[32m+[m[32mconst limitaciones = extraerLimitaciones(texto, materiales);[m
+[32m+[m[32mconst identidadExtendida = extraerIdentidadExtendida(texto, materiales);[m
+[32m+[m[32mconst bibliografia = extraerBibliografia(texto, materiales);[m
+[32m+[m[32mawait guardarSignificadoLote(archivo.nombre, pagina, significado);[m
+[32m+[m[32mawait guardarFuncionLote(archivo.nombre, pagina, funcion);[m
+[32m+[m[32mawait guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores);[m
+[32m+[m[32mawait guardarRelacionesLote(archivo.nombre, pagina, relaciones);[m
+[32m+[m[32mawait guardarProcesosLote(archivo.nombre, pagina, procesos);[m
+[32m+[m[32mawait guardarAplicacionesLote(archivo.nombre, pagina, aplicaciones);[m
+[32m+[m[32mawait guardarVentajasLote(archivo.nombre, pagina, ventajas);[m
+[32m+[m[32mawait guardarLimitacionesLote(archivo.nombre, pagina, limitaciones);[m
+[32m+[m[32mawait guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida);[m
+[32m+[m[32mawait guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);[m
+ [m
+       for (const r of registros) {[m
+         registrosPendientes.push({[m
+[36m@@ -198,6 +279,7 @@[m [mexport abstract class NeuronExtraccionBase {[m
+       // Guardar en lotes de 50, o al terminar el documento[m
+       if (registrosPendientes.length >= 50) {[m
+         await guardarLote(registrosPendientes);[m
+[32m+[m[32m        await guardarLotePropiedadesTurso(registrosPendientes);[m
+         registrosPendientes = [];[m
+       }[m
+ [m
+[36m@@ -206,6 +288,7 @@[m [mexport abstract class NeuronExtraccionBase {[m
+ [m
+     if (registrosPendientes.length > 0) {[m
+       await guardarLote(registrosPendientes);[m
+[32m+[m[32m      await guardarLotePropiedadesTurso(registrosPendientes);[m
+     }[m
+ [m
+     // Documento terminado: se marca completo y se limpia el progreso parcial[m
+[1mdiff --git a/src/extraction-neurons/base/NeuronExtraccionBase.ts b/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[1mindex fd84f6d..4733ec2 100644[m
+[1m--- a/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[1m+++ b/src/extraction-neurons/base/NeuronExtraccionBase.ts[m
+[36m@@ -18,6 +18,47 @@[m [mimport {[m
+ import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';[m
+ import { cargarDiccionarioMateriales, cargarDiccionarioComponentes } from '../diccionarios/materiales';[m
+ import { analizarPagina } from './motorExtraccion';[m
+[32m+[m[32mimport { extraerConocimientoConceptual, extraerReglasCausales } from './extractorConocimiento';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mextraerEspecificacionesDiseno,[m
+[32m+[m[32mextraerReaccionesQuimicas,[m
+[32m+[m[32mextraerHallazgosExperimentales,[m
+[32m+[m[32mextraerDatosMercado,[m
+[32m+[m[32mextraerTablasComparativas,[m
+[32m+[m[32m} from './extractorAmpliado';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mextraerSignificado,[m
+[32m+[m[32mextraerFuncion,[m
+[32m+[m[32mextraerFactoresModificadores,[m
+[32m+[m[32mextraerRelaciones,[m
+[32m+[m[32mextraerProcesos,[m
+[32m+[m[32mextraerAplicaciones,[m
+[32m+[m[32mextraerVentajas,[m
+[32m+[m[32mextraerLimitaciones,[m
+[32m+[m[32mextraerIdentidadExtendida,[m
+[32m+[m[32mextraerBibliografia,[m
+[32m+[m[32m} from './extractorESP001';[m
+[32m+[m[32mimport { guardarConocimientoLote, guardarReglasLote } from '../../turso/guardarConocimiento';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mguardarEspecificacionesLote,[m
+[32m+[m[32mguardarReaccionesLote,[m
+[32m+[m[32mguardarHallazgosLote,[m
+[32m+[m[32mguardarDatosMercadoLote,[m
+[32m+[m[32mguardarTablasComparativasLote,[m
+[32m+[m[32m} from '../../turso/guardarConocimientoAmpliado';[m
+[32m+[m[32mimport {[m
+[32m+[m[32mguardarSignificadoLote,[m
+[32m+[m[32mguardarFuncionLote,[m
+[32m+[m[32mguardarFactoresModificadoresLote,[m
+[32m+[m[32mguardarRelacionesLote,[m
+[32m+[m[32mguardarProcesosLote,[m
+[32m+[m[32mguardarAplicacionesLote,[m
+[32m+[m[32mguardarVentajasLote,[m
+[32m+[m[32mguardarLimitacionesLote,[m
+[32m+[m[32mguardarIdentidadExtendidaLote,[m
+[32m+[m[32mguardarBibliografiaLote,[m
+[32m+[m[32m} from '../../turso/guardarConocimientoESP001';[m
+[32m+[m[32mimport { guardarLotePropiedadesTurso } from '../../turso/guardarPropiedadesTurso';[m
+ import { documentoYaProcesado, borrarDocumento, guardarLote } from '../supabase/guardarExtraccion';[m
+ import { CheckpointNeurona, PropiedadExtraida, EntradaMaterial } from './tipos';[m
+ [m
+[36m@@ -180,6 +221,46 @@[m [mexport abstract class NeuronExtraccionBase {[m
+       if (capituloDetectado) capituloActual = capituloDetectado;[m
+ [m
+       const { registros, candidatos } = analizarPagina(texto, materiales, componentes);[m
+[32m+[m[32m      const conocimientoCandidato = extraerConocimientoConceptual(texto,[m
+[32m+[m[32mmateriales);[m
+[32m+[m[32mconst reglasCandidatas = extraerReglasCausales(texto);[m
+[32m+[m[32mconst especificaciones = extraerEspecificacionesDiseno(texto, materiales);[m
+[32m+[m[32mconst reacciones = extraerReaccionesQuimicas(texto, materiales);[m
+[32m+[m[32mconst hallazgos = extraerHallazgosExperimentales(texto, materiales);[m
+[32m+[m[32mconst datosMercado = extraerDatosMercado(texto, materiales);[m
+[32m+[m[32mconst tablasComparativas = extraerTablasComparativas(texto, materiales);[m
+[32m+[m[32mawait guardarConocimientoLote(archivo.nombre, pagina, conocimientoCandidato);[m
+[32m+[m[32mawait guardarReglasLote(archivo.nombre, pagina, reglasCandidatas);[m
+[32m+[m[32mawait guardarEspecificacionesLote(archivo.nombre, pagina, especificaciones);[m
+[32m+[m[32mawait guardarReaccionesLote(archivo.nombre, pagina, reacciones);[m
+[32m+[m[32mawait guardarHallazgosLote(archivo.nombre, pagina, hallazgos);[m
+[32m+[m[32mawait guardarDatosMercadoLote(archivo.nombre, pagina, datosMercado);[m
+[32m+[m[32mawait guardarTablasComparativasLote(archivo.nombre, pagina,[m
+[32m+[m[32mtablasComparativas);[m
+[32m+[m
+[32m+[m[32m// -- ESP-001: 10 categorías nuevas (significado, función, factores,[m
+[32m+[m[32m// relaciones, procesos, aplicaciones, ventajas, limitaciones,[m
+[32m+[m[32m// identidad extendida, bibliografía) --[m
+[32m+[m[32mconst significado = extraerSignificado(texto, materiales);[m
+[32m+[m[32mconst funcion = extraerFuncion(texto, materiales);[m
+[32m+[m[32mconst factoresModificadores = extraerFactoresModificadores(texto, materiales);[m
+[32m+[m[32mconst relaciones = extraerRelaciones(texto, materiales);[m
+[32m+[m[32mconst procesos = extraerProcesos(texto, materiales);[m
+[32m+[m[32mconst aplicaciones = extraerAplicaciones(texto, materiales);[m
+[32m+[m[32mconst ventajas = extraerVentajas(texto, materiales);[m
+[32m+[m[32mconst limitaciones = extraerLimitaciones(texto, materiales);[m
+[32m+[m[32mconst identidadExtendida = extraerIdentidadExtendida(texto, materiales);[m
+[32m+[m[32mconst bibliografia = extraerBibliografia(texto, materiales);[m
+[32m+[m[32mawait guardarSignificadoLote(archivo.nombre, pagina, significado);[m
+[32m+[m[32mawait guardarFuncionLote(archivo.nombre, pagina, funcion);[m
+[32m+[m[32mawait guardarFactoresModificadoresLote(archivo.nombre, pagina, factoresModificadores);[m
+[32m+[m[32mawait guardarRelacionesLote(archivo.nombre, pagina, relaciones);[m
+[32m+[m[32mawait guardarProcesosLote(archivo.nombre, pagina, procesos);[m
+[32m+[m[32mawait guardarAplicacionesLote(archivo.nombre, pagina, aplicaciones);[m
+[32m+[m[32mawait guardarVentajasLote(archivo.nombre, pagina, ventajas);[m
+[32m+[m[32mawait guardarLimitacionesLote(archivo.nombre, pagina, limitaciones);[m
+[32m+[m[32mawait guardarIdentidadExtendidaLote(archivo.nombre, pagina, identidadExtendida);[m
+[32m+[m[32mawait guardarBibliografiaLote(archivo.nombre, pagina, bibliografia);[m
+ [m
+       for (const r of registros) {[m
+         registrosPendientes.push({[m
+[36m@@ -198,6 +279,7 @@[m [mexport abstract class NeuronExtraccionBase {[m
+       // Guardar en lotes de 50, o al terminar el documento[m
+       if (registrosPendientes.length >= 50) {[m
+         await guardarLote(registrosPendientes);[m
+[32m+[m[32m        await guardarLotePropiedadesTurso(registrosPendientes);[m
+         registrosPendientes = [];[m
+       }[m
+ [m
+[36m@@ -206,6 +288,7 @@[m [mexport abstract class NeuronExtraccionBase {[m
+ [m
+     if (registrosPendientes.length > 0) {[m
+       await guardarLote(registrosPendientes);[m
+[32m+[m[32m      await guardarLotePropiedadesTurso(registrosPendientes);[m
+     }[m
+ [m
+     // Documento terminado: se marca completo y se limpia el progreso parcial[m
