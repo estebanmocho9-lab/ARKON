@@ -15,10 +15,10 @@ async function test() {
     valorDirecto: 78
   });
   console.log('? Resultado:', res1.valorCompuesto, '(inverso:', res1.valorInverso, ')');
-  console.log('   Anomalías:', res1.anomalias.length ? res1.anomalias : 'ninguna');
+  console.log('   Anomalï¿½as:', res1.anomalias.length ? res1.anomalias : 'ninguna');
   console.log('   Confianza:', res1.confianza);
 
-  // 2. Probar Resistencia a Compresión
+  // 2. Probar Resistencia a Compresiï¿½n
   console.log('\n?? Probando N011_ResistenciaCompresion...');
   const resistencia = new N011_ResistenciaCompresion();
   const res2 = await resistencia.process({
@@ -27,9 +27,9 @@ async function test() {
     valorDirecto: 42
   });
   console.log('? Resultado:', res2.valorCompuesto, '(inverso:', res2.valorInverso, ')');
-  console.log('   Anomalías:', res2.anomalias.length ? res2.anomalias : 'ninguna');
+  console.log('   Anomalï¿½as:', res2.anomalias.length ? res2.anomalias : 'ninguna');
 
-  // 3. Probar Conductividad Térmica
+  // 3. Probar Conductividad Tï¿½rmica
   console.log('\n?? Probando N021_ConductividadTermica...');
   const termica = new N021_ConductividadTermica();
   const res3 = await termica.process({
@@ -38,9 +38,9 @@ async function test() {
     valorDirecto: 65
   });
   console.log('? Resultado:', res3.valorCompuesto, '(inverso:', res3.valorInverso, ')');
-  console.log('   Anomalías:', res3.anomalias.length ? res3.anomalias : 'ninguna');
+  console.log('   Anomalï¿½as:', res3.anomalias.length ? res3.anomalias : 'ninguna');
 
-  console.log('\n?? Todas las pruebas completadas sin errores críticos.');
+  console.log('\n?? Todas las pruebas completadas sin errores crï¿½ticos.');
   console.log('   El sistema de neuronas funciona correctamente.');
 }
 

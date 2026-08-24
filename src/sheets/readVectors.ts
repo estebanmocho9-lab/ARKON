@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // src/sheets/readVectors.ts
 // Lee hoja NORMALIZACION — compatible con estructura real
 // Columnas: ID_Material, Estado, ...propiedades (nombres con tildes y espacios)
@@ -119,10 +119,6 @@ const MAPEO_HEADERS: Record<string, string> = {
   'superficie específica blaine':     'superficie_especifica_blaine',
   'superficie especifica blaine':     'superficie_especifica_blaine',
   'rectitud flujo':                   'rectitud_flujo',
-  'resistencia a tracción':           'resistencia_traccion_inv',
-  'resistencia a traccion':           'resistencia_traccion_inv',
-  'resistencia a compresión':         'resistencia_compresion_inv',
-  'resistencia a compresion':         'resistencia_compresion_inv',
   'deflectabilidad':                  'deflectabilidad',
   'complacencia elástica':            'complacencia_elastica',
   'complacencia elastica':            'complacencia_elastica',
@@ -272,7 +268,7 @@ export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
     console.log(`✅ Encabezados encontrados en fila ${headerRowIndex + 1} — ${headers.length} columnas`);
 
     // Resolver nombres de columnas una sola vez
-    const colMap: (string | null)[] = headers.map((h, i) => {
+    const colMap: (string | null)[] = headers.map((h: any, i: number) => {
       if (i === 0) return '__ID__';  // col A = ID del material
       if (i === 1) {
         const h2 = h?.toString().trim().toLowerCase();

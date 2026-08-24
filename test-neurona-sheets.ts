@@ -14,7 +14,7 @@ async function test() {
   console.log('  Valor compuesto (0-100):', resultado.valorCompuesto);
   console.log('  Valor inverso:', resultado.valorInverso);
   console.log('  Propiedad pendiente?', resultado.propiedadPendiente);
-  console.log('  Anomalías:', resultado.anomalias);
+  console.log('  Anomalï¿½as:', resultado.anomalias);
 }
 
 test().catch(console.error);

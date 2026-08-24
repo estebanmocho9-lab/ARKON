@@ -20,9 +20,9 @@ async function main() {
   const resultadoFragilidad = await motor.analizarProblema('fragilidad', input);
   console.log('Resultado fragilidad:', resultadoFragilidad);
 
-  console.log('\n?? ANALIZANDO ABSORCIÓN del material MA.001');
+  console.log('\n?? ANALIZANDO ABSORCIï¿½N del material MA.001');
   const resultadoAbsorcion = await motor.analizarProblema('absorcion', input);
-  console.log('Resultado absorción:', resultadoAbsorcion);
+  console.log('Resultado absorciï¿½n:', resultadoAbsorcion);
 }
 
 main().catch(console.error);

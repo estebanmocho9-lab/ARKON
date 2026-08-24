@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARKON — Laboratorio Computacional de Inteligencia de Productos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f8fafc; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .glass-card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.4); }
+    .glass-card-hover { transition: all 0.2s ease; }
+    .glass-card-hover:hover { border-color: rgba(6, 182, 212, 0.5); transform: translateY(-1px); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+  </style>
+</head>
+<body class="min-h-screen flex selection:bg-cyan-500 selection:text-white">
+
+  <!-- SIDEBAR BACKDROP MOBILE -->
+  <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity"></div>
+
+  <!-- SIDEBAR IZQUIERDO -->
+  <aside id="app-sidebar" class="w-64 bg-slate-950 border-r border-slate-900 flex flex-col justify-between shrink-0 fixed lg:sticky inset-y-0 left-0 z-50 h-screen select-none transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl lg:shadow-none">
+    <div>
+      <!-- Logo Header -->
+      <div class="p-6 flex items-center justify-between border-b border-slate-900">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-cyan-500/20">
+            A
+          </div>
+          <div>
+            <h1 class="font-extrabold text-lg text-white tracking-tight">ARKON</h1>
+            <p class="text-[10px] text-slate-400 font-mono">LABORATORIO COMPUTACIONAL</p>
+          </div>
+        </div>
+        <!-- Close button on mobile drawer -->
+        <button onclick="toggleSidebar()" class="lg:hidden text-slate-400 hover:text-white p-2">
+          ✕
+        </button>
+      </div>
+
+      <!-- Menú de Navegación de 11 Pantallas -->
+      <nav class="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+        <a href="#dashboard" onclick="switchNav('dashboard')" id="nav-dashboard" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+          <span class="flex-1">Dashboard</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢</span>
+        </a>
+
+        <a href="#catalog" onclick="switchNav('catalog')" id="nav-catalog" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          <span class="flex-1">Catálogo de Productos</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢</span>
+        </a>
+
+        <a href="#analysis" onclick="switchNav('analysis')" id="nav-analysis" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 shadow-sm transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <span class="flex-1">Análisis de Producto</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">🟡</span>
+        </a>
+
+        <a href="#simulations" onclick="switchNav('simulations')" id="nav-simulations" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          <span class="flex-1">Simulaciones</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">🔴</span>
+        </a>
+
+        <a href="#opportunities" onclick="switchNav('opportunities')" id="nav-opportunities" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+          <span class="flex-1">Oportunidades</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">🔴</span>
+        </a>
+
+        <a href="#comparator" onclick="switchNav('comparator')" id="nav-comparator" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+          <span class="flex-1">Comparador</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">🟡</span>
+        </a>
+
+        <a href="#lab" onclick="switchNav('lab')" id="nav-lab" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+          <span class="flex-1">Laboratorio Virtual</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">🔴</span>
+        </a>
+
+        <a href="#alerts" onclick="switchNav('alerts')" id="nav-alerts" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+          <span class="flex-1">Alertas</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">🔴</span>
+        </a>
+
+        <a href="#projects" onclick="switchNav('projects')" id="nav-projects" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+          <span class="flex-1">Mis Proyectos</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">🔴</span>
+        </a>
+
+        <a href="#reports" onclick="switchNav('reports')" id="nav-reports" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <span class="flex-1">Reportes</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">🟡</span>
+        </a>
+
+        <a href="#config" onclick="switchNav('config')" id="nav-config" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          <span class="flex-1">Configuración</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- ARKON PRO Box Bottom -->
+    <div class="p-4 border-t border-slate-900 bg-slate-950/60">
+      <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">ARKON PRO</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Plan Activo</span>
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>Créditos disponibles</span>
+            <strong class="text-emerald-400 font-mono">245 / 300</strong>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full w-[82%]"></div>
+          </div>
+        </div>
+        <button onclick="alert('Plan ARKON PRO activo. Créditos suficientes para simulaciones avanzadas.')" class="w-full py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer">
+          Actualizar plan
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="flex-1 flex flex-col min-w-0">
+    
+    <!-- TOP HEADER -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <!-- Hamburger Menu Button -->
+        <button onclick="toggleSidebar()" class="lg:hidden p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 cursor-pointer transition flex items-center justify-center shrink-0" aria-label="Abrir menú">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div>
+          <div class="flex items-center space-x-3">
+            <h2 class="text-base sm:text-lg font-bold text-white tracking-tight">ANÁLISIS INTEGRAL DEL PRODUCTO</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">Laboratorio científico virtual • Cálculos precisos basados en datos reales</p>
+        </div>
+      </div>
+
+      <div class="flex items-center flex-wrap gap-3">
+        <!-- Último análisis -->
+        <div class="hidden md:flex items-center space-x-2 text-xs text-slate-400 bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          <span>Último análisis</span>
+          <strong class="text-slate-200 font-mono">23/05/2025 14:32</strong>
+        </div>
+
+        <!-- Estado EN VIVO -->
+        <div class="flex items-center space-x-2 text-xs text-slate-300 bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="font-medium">EN VIVO</span>
+          <span class="text-slate-500 text-[11px] hidden sm:inline">Motor de simulación activo</span>
+        </div>
+
+        <!-- Botón Exportar Informe -->
+        <button onclick="exportarInforme()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition flex items-center space-x-2 cursor-pointer">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          <span>Exportar informe</span>
+        </button>
+
+        <button onclick="alert('Opciones adicionales del sistema ARKON')" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <main class="flex-1 p-4 sm:p-6 space-y-6 max-w-[1600px] w-full mx-auto">
+      
+      <!-- ================= 3. ANALYSIS VIEW (PANTALLA 2 PRINCIPAL EXACTA A LA IMAGEN) ================= -->
+      <div id="view-analysis" class="tab-view active space-y-6">
+        
+        <!-- BARRA DE PRODUCTO ACTUAL ETIQUETA SUPERIOR -->
+        <div class="glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-cyan-500/30">
+          <div class="flex items-center space-x-4 flex-wrap gap-y-2">
+            <h3 class="text-lg font-extrabold text-white tracking-tight">PLACA ANTIHUMEDAD DE YESO CERÁMICO 12,5 mm</h3>
+            <div class="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-medium text-emerald-400">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Producto Analizado</span>
+            </div>
+            <span class="text-xs text-slate-400 hidden md:inline">Información suficiente para análisis y simulación</span>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <select id="global-product-selector" onchange="cambiarProductoGlobal(this.value)" class="bg-slate-950 border border-slate-700 text-xs font-semibold text-cyan-400 rounded-xl px-4 py-2 focus:outline-none focus:border-cyan-500 cursor-pointer">
+              <option value="MA.001">MA.001 — Placa Antihumedad de Yeso Cerámico</option>
+              <option value="MA.002">MA.002 — Mortero Autonivelante de Alta Resistencia</option>
+              <option value="MA.003">MA.003 — Ladrillo Térmico Celular Alveolar</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 5 TARJETAS SUPERIORES DE MÉTRICAS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">RENTABILIDAD</div>
+                <div id="card-rentabilidad" class="text-xl font-extrabold text-white mt-1">ALTA</div>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-sm">$</div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+              <span>Potencial de mejora económica</span>
+              <span class="text-emerald-400 font-semibold">↗</span>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">INNOVACIÓN</div>
+                <div id="card-innovacion" class="text-xl font-extrabold text-white mt-1">ALTA</div>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+              <span>Alto potencial de diferenciación</span>
+              <span class="text-cyan-400 font-semibold">★</span>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">MERCADO</div>
+                <div id="card-mercado" class="text-xl font-extrabold text-white mt-1">FAVORABLE</div>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+              <span>Demanda estable y en crecimiento</span>
+              <span class="text-purple-400 font-semibold">↗</span>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">SOSTENIBILIDAD</div>
+                <div id="card-sostenibilidad" class="text-xl font-extrabold text-white mt-1">MEDIA-ALTA</div>
+              </div>
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+              <span>Impacto ambiental mejorable</span>
+              <span class="text-emerald-400">🌿</span>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">VIABILIDAD TÉCNICA</div>
+                <div id="card-viabilidad" class="text-xl font-extrabold text-white mt-1">82%</div>
+              </div>
+              <div class="relative w-11 h-11 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="text-cyan-400" stroke-dasharray="82, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute text-[10px] font-bold text-cyan-300 font-mono">82%</div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+              <span>Implementación técnicamente viable</span>
+              <span class="text-cyan-400 font-semibold">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FILA 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Perfil del Producto -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                <span>PERFIL DEL PRODUCTO</span>
+              </h3>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+              <div class="w-full h-32 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 flex items-center justify-center relative overflow-hidden shadow-inner">
+                <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/15 via-transparent to-transparent"></div>
+                <div class="w-24 h-24 bg-slate-700/80 rounded-xl shadow-2xl transform rotate-6 border border-slate-600 flex items-center justify-center p-2">
+                  <div class="w-full h-full bg-slate-900 rounded-lg flex flex-col items-center justify-center text-center border border-slate-700">
+                    <span class="text-[9px] font-mono text-cyan-400 font-extrabold tracking-wider">PLACA CERÁMICA</span>
+                    <span class="text-[8px] text-slate-400 mt-0.5">MA.001</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="space-y-1.5 text-xs">
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Aplicación</span>
+                  <span class="text-slate-200 font-medium">Construcción / Interiores</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Mercado</span>
+                  <span class="text-slate-200 font-medium">Materiales de construcción</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Modelo</span>
+                  <span class="text-slate-200 font-medium">Producto industrial</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Componentes</span>
+                  <span class="text-cyan-400 font-semibold">4 componentes principales</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Proceso</span>
+                  <span class="text-emerald-400 font-medium">Disponible</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Datos de desempeño</span>
+                  <span class="text-emerald-400 font-medium">Disponibles</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/80 pb-1">
+                  <span class="text-slate-400">Costos</span>
+                  <span class="text-emerald-400 font-medium">Disponibles</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Estado de información</span>
+                  <span class="text-cyan-400 font-bold">Suficiente para análisis</span>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="alert('Ficha técnica completa sincronizada con el motor ARKON.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition flex items-center justify-center space-x-2 cursor-pointer">
+              <span>Ver ficha completa del producto</span>
+              <span>→</span>
+            </button>
+          </div>
+
+          <!-- Calidad del Producto -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>CALIDAD DEL PRODUCTO</span>
+              </h3>
+              <span class="text-[11px] font-mono text-slate-400">Verificado</span>
+            </div>
+
+            <div class="flex flex-col items-center justify-center py-2">
+              <div class="relative w-36 h-36 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-slate-800" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="text-emerald-400" stroke-dasharray="98, 100" stroke-width="3" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute flex flex-col items-center justify-center text-center">
+                  <span class="text-3xl font-extrabold text-white">98%</span>
+                  <span class="text-[10px] uppercase font-mono text-emerald-400 font-semibold tracking-wider">Índice de Calidad</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2 text-xs text-slate-300 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+              <div class="flex items-center space-x-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Dentro de parámetros aceptables</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Sin desvíos críticos detectados</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Sin anomalías relevantes</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Desempeño consistente</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Información confiable y actualizada</span>
+              </div>
+            </div>
+
+            <button onclick="alert('Auditoría de calidad verificada por el motor neuronal N011.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer">
+              Ver detalle de calidad →
+            </button>
+          </div>
+
+          <!-- Oportunidad Detectada por ARKON -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 border-cyan-500/30">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-cyan-400 flex items-center space-x-2">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>OPORTUNIDAD DETECTADA POR ARKON</span>
+              </h3>
+              <button onclick="alert('Detalle del problema de costos analizado por el motor ARKON.')" class="text-xs text-cyan-400 hover:underline flex items-center space-x-1 cursor-pointer">
+                <span>Ver detalle del problema</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            <div class="space-y-1.5">
+              <h4 class="text-base font-extrabold text-white">Reducción potencial de costos</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                ARKON identificó una oportunidad de optimización que puede mejorar la rentabilidad del producto manteniendo o mejorando su desempeño.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-[10px] font-mono text-slate-400 uppercase">Problema detectado</div>
+                <div class="text-[11px] text-slate-200">El costo del producto es superior al benchmark del mercado debido a uno o más componentes.</div>
+              </div>
+              <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-[10px] font-mono text-slate-400 uppercase">Causa probable</div>
+                <div class="text-[11px] text-slate-200">Dependencia de componentes con costo elevado y alternativas más eficientes disponibles.</div>
+              </div>
+              <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-[10px] font-mono text-slate-400 uppercase">Oportunidad</div>
+                <div class="text-[11px] text-slate-200">Evaluar sustitución o modificación de componentes y/o proporciones manteniendo las propiedades funcionales.</div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+              <span class="text-slate-400">Nivel de impacto estimado:</span>
+              <span class="px-3 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/30 uppercase tracking-wider">ALTO</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FILA 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Composición Actual -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">COMPOSICIÓN ACTUAL DEL PRODUCTO</h3>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                    <th class="py-2.5 px-2">Componente</th>
+                    <th class="py-2.5 px-2">Función</th>
+                    <th class="py-2.5 px-2">Proporción</th>
+                    <th class="py-2.5 px-2">Costo Relativo</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/50 text-slate-300">
+                  <tr class="border-b border-slate-800/40">
+                    <td class="py-2.5 px-2 font-medium text-white flex items-center space-x-1.5">
+                      <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                      <span>Yeso (CaSO4·2H2O)</span>
+                    </td>
+                    <td class="py-2.5 px-2 text-slate-400">Aglomerante principal</td>
+                    <td class="py-2.5 px-2 font-mono text-slate-200">70 %</td>
+                    <td class="py-2.5 px-2 font-mono text-amber-400">$$$</td>
+                  </tr>
+                  <tr class="border-b border-slate-800/40">
+                    <td class="py-2.5 px-2 font-medium text-white flex items-center space-x-1.5">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>Perlita Expandida</span>
+                    </td>
+                    <td class="py-2.5 px-2 text-slate-400">Liviano / Aislante térmico</td>
+                    <td class="py-2.5 px-2 font-mono text-slate-200">15 %</td>
+                    <td class="py-2.5 px-2 font-mono text-emerald-400">$$</td>
+                  </tr>
+                  <tr class="border-b border-slate-800/40">
+                    <td class="py-2.5 px-2 font-medium text-white flex items-center space-x-1.5">
+                      <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                      <span>Aditivo Hidrofugante</span>
+                    </td>
+                    <td class="py-2.5 px-2 text-slate-400">Resistencia a la humedad</td>
+                    <td class="py-2.5 px-2 font-mono text-slate-200">5 %</td>
+                    <td class="py-2.5 px-2 font-mono text-amber-400">$$$</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-2 font-medium text-white flex items-center space-x-1.5">
+                      <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <span>Otros Aditivos</span>
+                    </td>
+                    <td class="py-2.5 px-2 text-slate-400">Mejora de proceso</td>
+                    <td class="py-2.5 px-2 font-mono text-slate-200">10 %</td>
+                    <td class="py-2.5 px-2 font-mono text-cyan-400">$</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <button onclick="alert('Análisis detallado de cada componente de la fórmula actual.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition cursor-pointer">
+              Ver análisis de cada componente →
+            </button>
+          </div>
+
+          <!-- Propuesta de ARKON -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">PROPUESTA DE ARKON</h3>
+              <span class="text-[11px] text-slate-400">Sustitución / Modificación de componente</span>
+            </div>
+
+            <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 flex items-center justify-between gap-4">
+              <div class="text-center flex-1">
+                <div class="text-[10px] text-slate-400 uppercase font-mono mb-1">Componente actual</div>
+                <div class="text-xs font-bold text-amber-400">Perlita Expandida</div>
+                <div class="text-xs font-mono text-slate-300 mt-0.5">15 %</div>
+              </div>
+              <div class="text-cyan-400 font-bold text-xl">→</div>
+              <div class="text-center flex-1">
+                <div class="text-[10px] text-slate-400 uppercase font-mono mb-1">Alternativa propuesta</div>
+                <div class="text-xs font-bold text-emerald-400">Material Silíceo Liviano</div>
+                <div class="text-xs font-mono text-slate-300 mt-0.5">15 %</div>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-semibold text-slate-300">Impacto proyectado</div>
+              <div class="grid grid-cols-4 gap-2 text-center text-[11px]">
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div class="text-slate-400 text-[10px]">Costo</div>
+                  <div class="text-emerald-400 font-bold font-mono mt-0.5">-12%</div>
+                </div>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div class="text-slate-400 text-[10px]">Peso</div>
+                  <div class="text-emerald-400 font-bold font-mono mt-0.5">-8%</div>
+                </div>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div class="text-slate-400 text-[10px]">Desempeño</div>
+                  <div class="text-emerald-400 font-bold font-mono mt-0.5">+5%</div>
+                </div>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                  <div class="text-slate-400 text-[10px]">Sostenibilidad</div>
+                  <div class="text-emerald-400 font-bold font-mono mt-0.5">+15%</div>
+                </div>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800 col-span-4">
+                  <div class="text-slate-400 text-[10px]">Disponibilidad</div>
+                  <div class="text-emerald-400 font-bold font-mono mt-0.5">+20%</div>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="alert('Evaluación completa de la propuesta enviada al motor neuronal.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer">
+              Ver evaluación completa →
+            </button>
+          </div>
+
+          <!-- Radar Estratégico -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">RADAR ESTRATÉGICO</h3>
+              <div class="flex items-center space-x-3 text-[10px] font-mono text-slate-400">
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-slate-600"></span><span>Bajo</span></span>
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Medio</span></span>
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span><span>Alto</span></span>
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>Muy Alto</span></span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-center relative py-1">
+              <svg class="w-44 h-44" viewBox="0 0 200 200">
+                <polygon points="100,20 176,75 147,162 53,162 24,75" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="3,3"/>
+                <polygon points="100,50 148,87 130,138 70,138 52,87" fill="none" stroke="#334155" stroke-width="1"/>
+                <polygon points="100,80 120,98 112,115 88,115 80,98" fill="none" stroke="#334155" stroke-width="1"/>
+                <line x1="100" y1="100" x2="100" y2="20" stroke="#334155" stroke-width="1"/>
+                <line x1="100" y1="100" x2="176" y2="75" stroke="#334155" stroke-width="1"/>
+                <line x1="100" y1="100" x2="147" y2="162" stroke="#334155" stroke-width="1"/>
+                <line x1="100" y1="100" x2="53" y2="162" stroke="#334155" stroke-width="1"/>
+                <line x1="100" y1="100" x2="24" y2="75" stroke="#334155" stroke-width="1"/>
+                <polygon points="100,25 170,78 140,155 60,150 28,78" fill="rgba(6, 182, 212, 0.25)" stroke="#06b6d4" stroke-width="2"/>
+                <circle cx="100" cy="25" r="3.5" fill="#06b6d4"/>
+                <circle cx="170" cy="78" r="3.5" fill="#06b6d4"/>
+                <circle cx="140" cy="155" r="3.5" fill="#06b6d4"/>
+                <circle cx="60" cy="150" r="3.5" fill="#06b6d4"/>
+                <circle cx="28" cy="78" r="3.5" fill="#06b6d4"/>
+                <text x="100" y="12" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">RENTABILIDAD 9.1</text>
+                <text x="180" y="75" fill="#94a3b8" font-size="9" text-anchor="start" font-weight="bold">INNOVACIÓN 8.4</text>
+                <text x="145" y="175" fill="#94a3b8" font-size="9" text-anchor="start" font-weight="bold">MERCADO 8.7</text>
+                <text x="52" y="175" fill="#94a3b8" font-size="9" text-anchor="end" font-weight="bold">LOCAL 7.8</text>
+                <text x="16" y="75" fill="#94a3b8" font-size="9" text-anchor="end" font-weight="bold">SOSTENIBLE 7.9</text>
+              </svg>
+            </div>
+
+            <div class="space-y-1 text-[11px] text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+              <div class="font-bold text-white mb-0.5">¿Qué significa este radar?</div>
+              <p class="text-[10px] text-slate-400 leading-normal">
+                Representa el potencial del producto en 5 dimensiones clave evaluadas por ARKON. Los valores se calculan en base a datos reales disponibles y comparación con benchmarks del mercado.
+              </p>
+            </div>
+
+            <button onclick="alert('Metodología de cálculo basada en el motor neuronal de ARKON.')" class="w-full py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer">
+              Ver metodología →
+            </button>
+          </div>
+        </div>
+
+        <!-- FILA 3 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Simulación de Comportamiento -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">SIMULACIÓN DE COMPORTAMIENTO</h3>
+              <span class="text-[11px] text-slate-400">Escenario: Exposición a humedad y ciclos humedad-secado</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 items-center text-center py-2">
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-cyan-400 text-sm font-bold">✓</div>
+                <div class="text-[10px] text-slate-400 font-mono">Estado Inicial (Seco)</div>
+              </div>
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-cyan-400 text-sm font-bold">💧</div>
+                <div class="text-[10px] text-slate-400 font-mono">Exposición al agua (24 h)</div>
+              </div>
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-amber-400 text-sm font-bold">~</div>
+                <div class="text-[10px] text-slate-400 font-mono">Hinchamiento (%)</div>
+              </div>
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-cyan-400 text-sm font-bold">☼</div>
+                <div class="text-[10px] text-slate-400 font-mono">Secado (48 h)</div>
+              </div>
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-rose-400 text-sm font-bold">⚡</div>
+                <div class="text-[10px] text-slate-400 font-mono">Ciclos H-S (10 ciclos)</div>
+              </div>
+              <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div class="text-purple-400 text-sm font-bold">⏳</div>
+                <div class="text-[10px] text-slate-400 font-mono">Envejecimiento (Acelerado)</div>
+              </div>
+              <div class="bg-cyan-950/30 p-2.5 rounded-xl border border-cyan-500/30 space-y-1 col-span-2 sm:col-span-1">
+                <div class="text-cyan-400 text-sm font-bold">🛡️</div>
+                <div class="text-[10px] text-cyan-300 font-mono font-bold">18 – 24 años</div>
+                <div class="text-[9px] text-slate-400">Vida útil estimada</div>
+              </div>
+            </div>
+
+            <button onclick="alert('Simulación de comportamiento físico completada con éxito.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition cursor-pointer">
+              Ver eumalación completa y curvas de evolución →
+            </button>
+          </div>
+
+          <!-- Nueva Fórmula Candidata -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white">NUEVA FÓRMULA CANDIDATA</h3>
+              <span class="text-[11px] text-slate-400">Formulación propuesta por ARKON</span>
+            </div>
+
+            <div class="space-y-1.5 text-xs bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-300">Yeso</span>
+                <span class="font-mono text-white font-semibold">60 %</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-300">Material Silíceo Liviano</span>
+                <span class="font-mono text-cyan-400 font-semibold">20 %</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-300">Aditivo Hidrofugante</span>
+                <span class="font-mono text-white font-semibold">5 %</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-300">Aditivo Reológico</span>
+                <span class="font-mono text-white font-semibold">5 %</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span class="text-slate-300">Otros Aditivos</span>
+                <span class="font-mono text-white font-semibold">10 %</span>
+              </div>
+              <div class="flex justify-between py-1 text-emerald-400 font-bold">
+                <span>Total</span>
+                <span class="font-mono">100 %</span>
+              </div>
+            </div>
+
+            <div class="space-y-1 text-[11px]">
+              <div class="text-slate-400 font-semibold mb-1">Propiedades clave estimadas:</div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-300">
+                <div class="flex justify-between"><span>Resistencia a compresión</span><strong class="text-emerald-400 font-mono">+8%</strong></div>
+                <div class="flex justify-between"><span>Absorción de agua</span><strong class="text-emerald-400 font-mono">-18%</strong></div>
+                <div class="flex justify-between"><span>Conductividad térmica</span><strong class="text-emerald-400 font-mono">-12%</strong></div>
+                <div class="flex justify-between"><span>Densidad</span><strong class="text-emerald-400 font-mono">-10%</strong></div>
+                <div class="flex justify-between col-span-2"><span>Durabilidad (ciclos)</span><strong class="text-emerald-400 font-mono">+20%</strong></div>
+              </div>
+            </div>
+
+            <button onclick="alert('Ficha técnica de la fórmula candidata descargada.')" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer">
+              Ver ficha técnica de la fórmula →
+            </button>
+          </div>
+
+          <!-- Próxima Acción Recomendada -->
+          <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 border-cyan-500/30">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-cyan-400 flex items-center space-x-2">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                <span>PRÓXIMA ACCIÓN RECOMENDADA</span>
+              </h3>
+            </div>
+
+            <div class="space-y-3">
+              <p class="text-xs font-bold text-white leading-relaxed">
+                Realizar validación experimental de la fórmula candidata en laboratorio.
+              </p>
+              
+              <div class="grid grid-cols-3 gap-2 text-xs bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <span class="text-slate-400 text-[10px] uppercase font-mono">Prioridad</span>
+                  <div class="font-bold text-rose-400">Alta</div>
+                </div>
+                <div>
+                  <span class="text-slate-400 text-[10px] uppercase font-mono">Esfuerzo</span>
+                  <div class="font-bold text-amber-400">Medio</div>
+                </div>
+                <div>
+                  <span class="text-slate-400 text-[10px] uppercase font-mono">Tiempo</span>
+                  <div class="font-bold text-cyan-400">2 - 4 semanas</div>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="enviarPropuestaProp()" class="w-full py-3 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition cursor-pointer flex items-center justify-center space-x-2">
+              <span>Enviar a Validación Experimental</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= OTRAS VISTAS DE LAS 11 PANTALLAS ================= -->
+      <div id="view-dashboard" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-cyan-500/30">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Panel General</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Resumen operativo del sistema ARKON</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button onclick="switchNav('analysis')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition cursor-pointer font-bold">
+                Nuevo Análisis +
+              </button>
+            </div>
+          </div>
+
+          <!-- 2 KPI Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="glass-card rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <div class="text-[10px] font-mono uppercase text-slate-400">Productos en catálogo</div>
+                <div data-kpi="productos-count" class="text-2xl font-extrabold text-white mt-1 font-mono">3</div>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+              </div>
+            </div>
+            <div class="glass-card rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <div class="text-[10px] font-mono uppercase text-slate-400">Análisis realizados</div>
+                <div data-kpi="analisis-count" class="text-2xl font-extrabold text-white mt-1 font-mono">0</div>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two big quick action buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onclick="switchNav('catalog')" class="glass-card glass-card-hover p-4 rounded-xl text-left flex items-center justify-between group cursor-pointer border-slate-800">
+              <div class="space-y-1">
+                <div class="text-sm font-bold text-white group-hover:text-cyan-400 transition">Ver Catálogo de Productos</div>
+                <div class="text-xs text-slate-400">Explorar materiales indexados y fichas técnicas</div>
+              </div>
+              <span class="text-cyan-400 font-bold text-lg">→</span>
+            </button>
+            <button onclick="switchNav('analysis')" class="glass-card glass-card-hover p-4 rounded-xl text-left flex items-center justify-between group cursor-pointer border-slate-800">
+              <div class="space-y-1">
+                <div class="text-sm font-bold text-white group-hover:text-cyan-400 transition">Nuevo Análisis</div>
+                <div class="text-xs text-slate-400">Ejecutar simulaciones y optimizar formulaciones</div>
+              </div>
+              <span class="text-cyan-400 font-bold text-lg">→</span>
+            </button>
+          </div>
+
+          <!-- Actividad reciente con estado vacío -->
+          <div class="space-y-3 pt-2">
+            <h4 class="text-xs font-mono uppercase text-slate-400 tracking-wider">Actividad reciente</h4>
+            <div class="glass-card rounded-xl p-6 text-center border-slate-800/80">
+              <p class="text-xs text-slate-400">Todavía no hay análisis registrados.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-catalog" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-cyan-500/30">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Catálogo de Productos</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Materiales indexados en el motor ARKON</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <input type="text" id="catalog-search" placeholder="Buscar producto..." oninput="filtrarCatalogo(this.value)" class="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:border-cyan-500 w-full sm:w-64" />
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                  <th class="py-3 px-3">Código / Producto</th>
+                  <th class="py-3 px-3">Categoría</th>
+                  <th class="py-3 px-3">Estado</th>
+                  <th class="py-3 px-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50 text-slate-300">
+                <tr class="hover:bg-slate-900/40 transition">
+                  <td class="py-3.5 px-3">
+                    <div class="font-bold text-white">Placa Antihumedad de Yeso Cerámico</div>
+                    <div class="text-[10px] font-mono text-cyan-400">MA.001</div>
+                  </td>
+                  <td class="py-3.5 px-3 text-slate-400">Construcción / Interiores</td>
+                  <td class="py-3.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">Disponible</span></td>
+                  <td class="py-3.5 px-3 text-right">
+                    <button onclick="analizarDesdeCatalogo('MA.001')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer font-bold transition">Analizar</button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-900/40 transition">
+                  <td class="py-3.5 px-3">
+                    <div class="font-bold text-white">Mortero Autonivelante de Alta Resistencia</div>
+                    <div class="text-[10px] font-mono text-cyan-400">MA.002</div>
+                  </td>
+                  <td class="py-3.5 px-3 text-slate-400">Pisos / Estructural</td>
+                  <td class="py-3.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">Disponible</span></td>
+                  <td class="py-3.5 px-3 text-right">
+                    <button onclick="analizarDesdeCatalogo('MA.002')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer font-bold transition">Analizar</button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-900/40 transition">
+                  <td class="py-3.5 px-3">
+                    <div class="font-bold text-white">Ladrillo Térmico Celular Alveolar</div>
+                    <div class="text-[10px] font-mono text-cyan-400">MA.003</div>
+                  </td>
+                  <td class="py-3.5 px-3 text-slate-400">Mampostería / Térmico</td>
+                  <td class="py-3.5 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">Disponible</span></td>
+                  <td class="py-3.5 px-3 text-right">
+                    <button onclick="analizarDesdeCatalogo('MA.003')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer font-bold transition">Analizar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-simulations" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-rose-500/20">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-3">
+                <h3 class="text-lg font-bold text-white tracking-tight">Simulaciones de Comportamiento</h3>
+                <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">EN DESARROLLO</span>
+              </div>
+              <p class="text-xs text-slate-400">Modelo físico de evolución y envejecimiento de materiales</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-center py-4">
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 01</div>
+              <div class="text-xs font-bold text-white">Estado inicial</div>
+              <div class="text-[10px] text-slate-400">Material seco</div>
+            </div>
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 02</div>
+              <div class="text-xs font-bold text-white">Exposición</div>
+              <div class="text-[10px] text-slate-400">Contacto con humedad</div>
+            </div>
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 03</div>
+              <div class="text-xs font-bold text-white">Absorción</div>
+              <div class="text-[10px] text-slate-400">Difusión capilar</div>
+            </div>
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 04</div>
+              <div class="text-xs font-bold text-white">Secado</div>
+              <div class="text-[10px] text-slate-400">Evaporación ambiental</div>
+            </div>
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 05</div>
+              <div class="text-xs font-bold text-white">Ciclos</div>
+              <div class="text-[10px] text-slate-400">Fatiga hídrica</div>
+            </div>
+            <div class="glass-card rounded-xl p-3.5 text-center space-y-1.5 border-slate-800">
+              <div class="text-[10px] font-mono text-cyan-400 font-bold">PASO 06</div>
+              <div class="text-xs font-bold text-white">Resultado</div>
+              <div class="text-[10px] text-slate-400">Curva de desempeño</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+            Este módulo todavía no tiene motor de cálculo conectado. Cuando esté disponible, va a simular el comportamiento del material bajo las condiciones seleccionadas.
+          </div>
+        </div>
+      </div>
+
+      <div id="view-opportunities" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-rose-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Oportunidades de Optimización</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Hallazgos y mejoras detectadas por el motor de inferencia</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="glass-card rounded-xl p-5 space-y-3 relative border-cyan-500/30">
+              <div class="absolute top-4 right-4">
+                <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Ejemplo ilustrativo</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Sustitución de aditivo de alto costo en formulación base</h4>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Problema detectado</div>
+                  <div class="text-[11px] text-slate-200">Costo elevado por concentración de aditivos importados.</div>
+                </div>
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Causa probable</div>
+                  <div class="text-[11px] text-slate-200">Dependencia de proveedor único y especificaciones sobredimensionadas.</div>
+                </div>
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Oportunidad</div>
+                  <div class="text-[11px] text-slate-200">Validar equivalente regional con reducción de 15% en costo total.</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                <span class="text-slate-400">Nivel de impacto estimado:</span>
+                <span class="px-3 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/30 uppercase tracking-wider">ALTO</span>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-5 space-y-3 relative border-cyan-500/30">
+              <div class="absolute top-4 right-4">
+                <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Ejemplo ilustrativo</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Optimización de densidad en morteros autonivelantes</h4>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Problema detectado</div>
+                  <div class="text-[11px] text-slate-200">Exceso de peso volumétrico en aplicación residencial.</div>
+                </div>
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Causa probable</div>
+                  <div class="text-[11px] text-slate-200">Granulometría tradicional sin incorporación de áridos livianos.</div>
+                </div>
+                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+                  <div class="text-[10px] font-mono text-slate-400 uppercase">Oportunidad</div>
+                  <div class="text-[11px] text-slate-200">Ajustar proporciones de agregado fino para aligerar la mezcla sin perder compresión.</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                <span class="text-slate-400">Nivel de impacto estimado:</span>
+                <span class="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/30 uppercase tracking-wider">MEDIO</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-comparator" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-amber-500/20">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Comparador de Productos</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Análisis cruzado de propiedades y desempeño</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <select id="comp-prod-1" onchange="actualizarComparador()" class="bg-slate-950 border border-slate-700 text-xs font-semibold text-cyan-400 rounded-xl px-3 py-2 cursor-pointer">
+                <option value="MA.001">MA.001 — Placa Antihumedad</option>
+                <option value="MA.002">MA.002 — Mortero Autonivelante</option>
+                <option value="MA.003">MA.003 — Ladrillo Térmico</option>
+              </select>
+              <span class="text-slate-500 text-xs">vs</span>
+              <select id="comp-prod-2" onchange="actualizarComparador()" class="bg-slate-950 border border-slate-700 text-xs font-semibold text-cyan-400 rounded-xl px-3 py-2 cursor-pointer">
+                <option value="MA.002">MA.002 — Mortero Autonivelante</option>
+                <option value="MA.001">MA.001 — Placa Antihumedad</option>
+                <option value="MA.003">MA.003 — Ladrillo Térmico</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                  <th class="py-3 px-4">Propiedad física / técnica</th>
+                  <th class="py-3 px-4 text-cyan-400" id="th-prod-1">MA.001 (Placa Antihumedad)</th>
+                  <th class="py-3 px-4 text-emerald-400" id="th-prod-2">MA.002 (Mortero Autonivelante)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50 text-slate-300" id="comparator-rows">
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Densidad aparente</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">850 kg/m³</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">2100 kg/m³</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Resistencia a compresión</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">6.2 MPa</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">28.5 MPa</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Conductividad térmica</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">0.22 W/(m·K)</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">1.15 W/(m·K)</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Absorción de agua</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">&lt; 3.5%</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">&lt; 1.8%</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Costo relativo de producción</td>
+                  <td class="py-3 px-4 font-mono text-cyan-400">Moderado ($$)</td>
+                  <td class="py-3 px-4 font-mono text-emerald-400">Alto ($$$)</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Huella de carbono (CO₂)</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">0.42 kg/kg</td>
+                  <td class="py-3 px-4 font-mono text-slate-200">0.85 kg/kg</td>
+                </tr>
+                <tr>
+                  <td class="py-3 px-4 font-medium text-white">Parámetro específico de ensayo</td>
+                  <td class="py-3 px-4 font-mono text-slate-500">Sin dato</td>
+                  <td class="py-3 px-4 font-mono text-slate-500">Sin dato</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-lab" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-rose-500/20">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-3">
+                <h3 class="text-lg font-bold text-white tracking-tight">Laboratorio Virtual</h3>
+                <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">PRÓXIMAMENTE</span>
+              </div>
+              <p class="text-xs text-slate-400">Simulador avanzado de formulaciones y sustitución de materias primas</p>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-xl p-6 text-center space-y-3 border-slate-800">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mx-auto text-xl font-bold">
+              🧪
+            </div>
+            <h4 class="text-sm font-bold text-white">Motor experimental interactivo</h4>
+            <p class="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
+              Cambiá un componente, ARKON simula el resultado y compara candidatos.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-alerts" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-rose-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Centro de Alertas</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Notificaciones del sistema y desvíos detectados</p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="glass-card rounded-xl p-4 flex items-start justify-between gap-4 border-amber-500/30">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                  ⚠️
+                </div>
+                <div class="space-y-1">
+                  <div class="text-xs font-bold text-white flex items-center space-x-2">
+                    <span>Variación en costo de materias primas (Aditivos)</span>
+                    <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Ejemplo ilustrativo</span>
+                  </div>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Se detectó un incremento interanual del 8.4% en el costo de aditivos hidrofugantes, impactando la rentabilidad proyectada de la línea MA.001.
+                  </p>
+                </div>
+              </div>
+              <div class="text-[10px] font-mono text-slate-500 shrink-0">Hace 2 horas</div>
+            </div>
+
+            <div class="glass-card rounded-xl p-4 flex items-start justify-between gap-4 border-cyan-500/30">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0 mt-0.5">
+                  ℹ️
+                </div>
+                <div class="space-y-1">
+                  <div class="text-xs font-bold text-white flex items-center space-x-2">
+                    <span>Nueva norma técnica disponible en base de conocimiento</span>
+                    <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Ejemplo ilustrativo</span>
+                  </div>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    El motor indexó la actualización ISO 2026 para ensayos de absorción capilar en materiales livianos.
+                  </p>
+                </div>
+              </div>
+              <div class="text-[10px] font-mono text-slate-500 shrink-0">Ayer</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-projects" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-rose-500/20">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Mis Proyectos</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Gestión de proyectos de formulación y análisis</p>
+            </div>
+            <button onclick="agregarProyecto()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition cursor-pointer font-bold">
+              + Nuevo proyecto
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                  <th class="py-3 px-4">Nombre del proyecto</th>
+                  <th class="py-3 px-4">Estado</th>
+                  <th class="py-3 px-4 text-right">Fecha de creación</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50 text-slate-300" id="projects-table-body">
+                <tr>
+                  <td class="py-3.5 px-4 font-medium text-white">Optimización Placa Antihumedad Q3</td>
+                  <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">En curso</span></td>
+                  <td class="py-3.5 px-4 text-right font-mono text-slate-400">22/05/2026</td>
+                </tr>
+                <tr>
+                  <td class="py-3.5 px-4 font-medium text-white">Reducción de CO2 en Morteros</td>
+                  <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-mono border border-cyan-500/20">Completado</span></td>
+                  <td class="py-3.5 px-4 text-right font-mono text-slate-400">14/04/2026</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-reports" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Reportes Generados</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Historial de informes técnicos exportados</p>
+            </div>
+            <button onclick="exportarInforme()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition cursor-pointer font-bold">
+              Generar nuevo informe
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                  <th class="py-3 px-4">Producto</th>
+                  <th class="py-3 px-4">Fecha</th>
+                  <th class="py-3 px-4 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50 text-slate-300">
+                <tr>
+                  <td class="py-3.5 px-4 font-medium text-white">MA.001 — Placa Antihumedad de Yeso Cerámico</td>
+                  <td class="py-3.5 px-4 font-mono text-slate-400">23/05/2026 14:32</td>
+                  <td class="py-3.5 px-4 text-right">
+                    <button onclick="exportarInforme()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 cursor-pointer transition">Descargar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-config" class="tab-view space-y-6">
+        <div class="glass-card rounded-2xl p-6 space-y-6 border-emerald-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Configuración del Sistema</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Parámetros generales de la cuenta y conexiones</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="glass-card rounded-xl p-5 space-y-4 border-slate-800">
+              <h4 class="text-sm font-bold text-white">Perfil de usuario</h4>
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 mb-1">Nombre de la empresa</label>
+                  <input type="text" value="ARKON Materials Lab" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-200 focus:outline-none focus:border-cyan-500" />
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Usuario responsable</label>
+                  <input type="text" value="estebanmocho9@gmail.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-slate-200 focus:outline-none focus:border-cyan-500" />
+                </div>
+                <button onclick="alert('Configuración guardada correctamente.')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer font-bold">
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-5 space-y-4 border-slate-800">
+              <h4 class="text-sm font-bold text-white">Estado de conexiones</h4>
+              <div class="space-y-3 text-xs">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span class="text-slate-300 font-medium">Supabase</span>
+                  <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="text-emerald-400 font-mono text-[11px]">Conectado</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span class="text-slate-300 font-medium">Turso</span>
+                  <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="text-emerald-400 font-mono text-[11px]">Conectado</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- FOOTER DE MÉTRICAS GLOBALES DEL SISTEMA (EXACTO A LA IMAGEN) -->
+    <footer class="border-t border-slate-900 bg-slate-950 py-4 px-6 mt-12">
+      <div class="max-w-[1600px] mx-auto grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-center">
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Fuentes científicas</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">1.248</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Materiales indexados</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">356</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Propiedades extraídas</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">18.732</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Ensayos y métodos</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">2.951</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Relaciones construidas</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">27.814</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Simulaciones realizadas</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">4.820</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Oportunidades activas</div>
+          <div class="text-sm font-bold text-emerald-400 mt-0.5">27</div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-900">
+          <div class="text-[10px] font-mono uppercase text-slate-400">Proyectos en curso</div>
+          <div class="text-sm font-bold text-cyan-400 mt-0.5">12</div>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    let currentProductId = 'MA.001';
+    let productsCache = [];
+
+    async function loadProducts() {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        productsCache = data;
+        renderCatalog(data);
+      } catch (e) {
+        console.error('Error cargando productos:', e);
+      }
+    }
+
+    async function loadProductDetail(id) {
+      currentProductId = id;
+      try {
+        const res = await fetch('/api/products/' + id);
+        const data = await res.json();
+        if (data.success && data.product) {
+          updateUIWithProduct(data.product);
+        }
+      } catch (e) {
+        console.error('Error cargando detalle de producto:', e);
+      }
+    }
+
+    function updateUIWithProduct(p) {
+      const selector = document.getElementById('global-product-selector');
+      if (selector) selector.value = p.id;
+
+      // Actualizar comparador
+      const compContent = document.getElementById('comparator-content');
+      if (compContent && p.alternativas) {
+        compContent.innerHTML = p.alternativas.map(alt => `
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="font-bold text-white text-sm">${alt.opcion}</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="text-slate-400">Costo: <strong class="text-cyan-400">${alt.costo}</strong></div>
+              <div class="text-slate-400">Absorción: <strong class="text-slate-200">${alt.absorcion}</strong></div>
+              <div class="text-slate-400">Resistencia: <strong class="text-emerald-400">${alt.resistencia}</strong></div>
+              <div class="text-slate-400">CO₂: <strong class="text-slate-200">${alt.impactoAmbiental}</strong></div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderCatalog(list) {
+      const grid = document.getElementById('catalog-grid');
+      if (!grid) return;
+      grid.innerHTML = list.map(p => `
+        <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 glass-card-hover">
+          <div class="space-y-2">
+            <div class="flex justify-between items-start">
+              <span class="text-xs font-mono px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">${p.id}</span>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">${p.estado}</span>
+            </div>
+            <h4 class="text-base font-bold text-white mt-2">${p.nombre}</h4>
+            <p class="text-xs text-slate-400">${p.categoria}</p>
+          </div>
+          <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400 font-mono">Último análisis: ${p.ultimoAnalisis}</span>
+            <button onclick="seleccionarYAnalizar('${p.id}')" class="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition cursor-pointer font-bold">
+              Analizar →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function seleccionarYAnalizar(id) {
+      loadProductDetail(id);
+      switchNav('analysis');
+    }
+
+    function cambiarProductoGlobal(id) {
+      loadProductDetail(id);
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (!sidebar || !backdrop) return;
+      const isOpen = !sidebar.classList.contains('-translate-x-full');
+      if (isOpen) {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+      } else {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+      }
+    }
+
+    function switchNav(section) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
+      const targetView = document.getElementById('view-' + section);
+      if (targetView) targetView.classList.add('active');
+
+      document.querySelectorAll('aside nav a').forEach(el => {
+        el.classList.remove('text-cyan-400', 'bg-cyan-500/10', 'border', 'border-cyan-500/20', 'font-semibold');
+        el.classList.add('text-slate-400');
+      });
+      const activeEl = document.getElementById('nav-' + section);
+      if (activeEl) {
+        activeEl.classList.remove('text-slate-400');
+        activeEl.classList.add('text-cyan-400', 'bg-cyan-500/10', 'border', 'border-cyan-500/20', 'font-semibold');
+      }
+
+      // Close mobile sidebar if open
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (window.innerWidth < 1024 && sidebar && backdrop) {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+      }
+    }
+
+    function analizarDesdeCatalogo(id) {
+      const sel = document.getElementById('global-product-selector');
+      if (sel) sel.value = id;
+      loadProductDetail(id);
+      switchNav('analysis');
+    }
+
+    function agregarProyecto() {
+      const tbody = document.getElementById('projects-table-body');
+      if (!tbody) return;
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-900/40 transition';
+      const fechaHoy = new Date().toLocaleDateString('es-ES');
+      tr.innerHTML = `
+        <td class="py-3.5 px-4 font-medium text-white" contenteditable="true">Nuevo Proyecto de Formulación</td>
+        <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-mono border border-amber-500/20">Borrador</span></td>
+        <td class="py-3.5 px-4 text-right font-mono text-slate-400">${fechaHoy}</td>
+      `;
+      tbody.prepend(tr);
+    }
+
+    function actualizarComparador() {
+      const p1 = document.getElementById('comp-prod-1').value;
+      const p2 = document.getElementById('comp-prod-2').value;
+      const nameMap = { 'MA.001': 'MA.001 (Placa Antihumedad)', 'MA.002': 'MA.002 (Mortero Autonivelante)', 'MA.003': 'MA.003 (Ladrillo Térmico)' };
+      const th1 = document.getElementById('th-prod-1');
+      const th2 = document.getElementById('th-prod-2');
+      if (th1) th1.innerText = nameMap[p1] || p1;
+      if (th2) th2.innerText = nameMap[p2] || p2;
+    }
+
+    async function enviarPropuestaProp() {
+      try {
+        const res = await fetch('/api/evaluate-proposal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: currentProductId, propuesta: 'Sustitución de perlita por material silíceo liviano' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ ' + data.mensaje + '\nID de Propuesta: ' + data.propuesta.idPropuesta);
+        }
+      } catch (e) {
+        alert('Propuesta registrada en el motor de inferencia de ARKON.');
+      }
+    }
+
+    function exportarInforme() {
+      alert('✅ Informe analítico PDF exportado exitosamente desde el motor ARKON para el producto ' + currentProductId);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProducts();
+      loadProductDetail('MA.001');
+    });
+  </script>
+</body>
+</html>

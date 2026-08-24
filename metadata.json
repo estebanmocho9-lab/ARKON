@@ -1,0 +1,6 @@
+{
+  "name": "Arkon Neural Engine App",
+  "description": "Material science neural inference and physical property reasoning engine migrated from GitHub",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

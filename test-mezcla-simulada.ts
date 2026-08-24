@@ -1,5 +1,5 @@
 // test-mezcla-simulada.ts
-// Prueba de lógica de mezcla con valores simulados (sin Supabase real)
+// Prueba de lï¿½gica de mezcla con valores simulados (sin Supabase real)
 
 // --- Mock de Supabase ---
 const mockSupabase = {
@@ -49,7 +49,7 @@ async function test() {
   });
   console.log('Valor compuesto:', resultado.valorCompuesto);
   console.log('Valor inverso:', resultado.valorInverso);
-  console.log('Anomalías:', resultado.anomalias.length ? resultado.anomalias : 'ninguna');
+  console.log('Anomalï¿½as:', resultado.anomalias.length ? resultado.anomalias : 'ninguna');
 }
 
 test().catch(console.error);
