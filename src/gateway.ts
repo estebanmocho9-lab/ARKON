@@ -80,7 +80,7 @@ app.post('/api/neural-analysis', async (req, res) => {
   }
 });
 
-app.all('*', proxyToArkon);
+app.use(proxyToArkon);
 
 const server = app.listen(PORT, () => {
   console.log(`ARKON public gateway running on port ${PORT}`);
