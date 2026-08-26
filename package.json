@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/gateway.js",
     "dev": "ts-node src/server.ts",
     "lint": "tsc --noEmit",
     "sync": "tsc && node dist/sheets/syncData.js",
