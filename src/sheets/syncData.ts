@@ -1,7 +1,6 @@
 // ============================================================
 // src/sheets/syncData.ts
 // NORMALIZACION de Google Sheets = única fuente de vectores.
-// materiales_vectores queda fuera del flujo operativo.
 // ============================================================
 
 import { readVectorsFromSheet } from './readVectors';
@@ -57,25 +56,8 @@ export async function getVectorFromSheet(
   return normalizarPropiedades(vector.propiedades);
 }
 
-// Alias temporal de compatibilidad para código externo.
-// IMPORTANTE: ya NO consulta Supabase; lee NORMALIZACION directamente.
-export async function getVectorFromSupabase(
-  materialId: string,
-  estado?: string
-): Promise<Record<string, number | null> | null> {
-  return getVectorFromSheet(materialId, estado);
-}
-
 // Lista de materiales disponible directamente desde NORMALIZACION.
-export async function listarMaterialesSupabase(): Promise<string[]> {
+export async function listarMaterialesDesdeSheet(): Promise<string[]> {
   const vectors = await readVectorsFromSheet();
   return [...new Set(vectors.map(v => v.materialId.trim()).filter(Boolean))];
-}
-
-// La antigua sincronización NORMALIZACION → materiales_vectores queda
-// deliberadamente desactivada. No se escribe ni se lee esa tabla.
-export async function syncMaterialesToSupabase(): Promise<void> {
-  throw new Error(
-    'La sincronización a materiales_vectores está DESACTIVADA. NORMALIZACION de Google Sheets es la fuente única.'
-  );
 }
