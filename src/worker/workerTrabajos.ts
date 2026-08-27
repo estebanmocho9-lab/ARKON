@@ -6,7 +6,7 @@ import { syncMaterialesToSupabase, getVectorFromSupabase } from '../sheets/syncD
 
 interface CruceCientifico { nombre_cruce: string; propiedades_requeridas: string[]; formula: string; descripcion: string; problema: string; }
 interface ProblemaConfig { nombre_problema: string; cruces_activos: { nombreCruce: string; peso: number }[]; formula_global: string; descripcion: string; }
-interface TrizContradicion { param_triz_mejora: string; param_triz_empeora: string; propiedades_mejora: string[]; propiedades_empeora: string[]; nombres_principios: string[]; }
+interface TrizContradiccion { param_triz_mejora: string; param_triz_empeora: string; propiedades_mejora: string[]; propiedades_empeora: string[]; nombres_principios: string[]; }
 interface ReglaMezcla { propiedad_nombre: string; formula: string; descripcion: string; }
 
 function evaluarFormula(formula: string, vector: Record<string, number | null>): number | null {
@@ -28,9 +28,9 @@ async function analizarMaterial(materialId: string, contexto: string, vector: Re
   const problema = problemaData as ProblemaConfig | null;
   const { data: crucesData } = await supabase.from('cruces_cientificos').select('*').eq('problema', contexto).eq('activo', true);
   const cruces = (crucesData ?? []) as CruceCientifico[];
-
   const resultadosCruces: Record<string, number> = {};
   const crucesSinDatos: string[] = [];
+
   for (const cruce of cruces) {
     const valor = evaluarFormula(cruce.formula, vector);
     if (valor !== null) resultadosCruces[cruce.nombre_cruce] = valor;
@@ -100,40 +100,49 @@ async function procesarTrabajo(trabajo: any): Promise<void> {
   const { id, producto, material_id, contexto } = trabajo;
   console.log(`\n⚙️ Procesando trabajo ${id} — ${producto} (${contexto})`);
   await supabase.from('trabajos').update({ estado:'procesando', actualizado_en:new Date().toISOString() }).eq('id', id);
-
   try {
     console.log('   📥 Sincronizando NORMALIZACION desde Google Sheets...');
     await syncMaterialesToSupabase();
-
     console.log(`   📊 Leyendo vector sincronizado de ${material_id}...`);
     const vector = await getVectorFromSupabase(material_id);
     if (!vector) throw new Error(`No se encontró el vector real de ${material_id} en NORMALIZACION`);
-
     const propConDatos = Object.values(vector).filter(v => v !== null && v !== undefined).length;
     console.log(`   📊 Vector real: ${propConDatos} propiedades con datos`);
     console.log(`   📊 Muestra: absorcion_agua=${vector.absorcion_agua}, porosidad_total=${vector.porosidad_total}, resistencia_compresion=${vector.resistencia_compresion}`);
-
     console.log(`   🧠 Ejecutando motor científico para contexto: ${contexto}...`);
     const resultado = await analizarMaterial(material_id, contexto, vector);
     console.log(`   📊 Índice real (${contexto}): ${resultado.indice}/100`);
     console.log(`   📊 Cobertura: ${Math.round(resultado.cobertura*100)}%`);
     console.log(`   📊 Detalle cruces: ${JSON.stringify(resultado.detalle)}`);
     if (resultado.triz.length) console.log(`   🔧 Principios TRIZ: ${resultado.triz.join(', ')}`);
-
     const { data: resultadoGuardado, error: errorResultado } = await supabase.from('resultados').insert({
-      producto,
-      problema_detectado:`Análisis de ${contexto} — índice: ${resultado.indice}/100 (cobertura ${Math.round(resultado.cobertura*100)}%)`,
+      producto, problema_detectado:`Análisis de ${contexto} — índice: ${resultado.indice}/100 (cobertura ${Math.round(resultado.cobertura*100)}%)`,
       causas_fisicas:resultado.causas.slice(0,5),
       soluciones_propuestas:[...resultado.soluciones.slice(0,3), ...(resultado.triz.length ? [`Principios TRIZ aplicables: ${resultado.triz.slice(0,3).join(', ')}`] : [])].slice(0,5),
       compatibilidades:[], mejoras:resultado.triz.slice(0,3), confianza_general:Math.round(resultado.cobertura*100)/100,
       neuronas_activadas:Object.keys(resultado.detalle).length, inferencias_generadas:resultado.causas.length, coherencia_global:resultado.indice/100,
     }).select('id').single();
-    if (errorResultado) throw errorResultado;
-
-    await supabase.from('trabajos').update({ estado:'completado', resultado_id:resultadoGuardado?.id, actualizado_en:new Date().toISOString(), error_msg:null }).eq('id',id);
+    if (errorResultado || !resultadoGuardado) throw new Error(`Error guardando resultado: ${errorResultado?.message}`);
+    await supabase.from('trabajos').update({ estado:'completado', resultado_id:resultadoGuardado.id, actualizado_en:new Date().toISOString(), error_msg:null }).eq('id',id);
     console.log(`   ✅ Trabajo ${id} completado.`);
   } catch (error:any) {
     console.error(`   ❌ Trabajo ${id} falló:`, error?.message || error);
     await supabase.from('trabajos').update({ estado:'error', error_msg:error?.message || String(error), actualizado_en:new Date().toISOString() }).eq('id',id);
   }
 }
+
+async function revisarPendientes(): Promise<void> {
+  const { data, error } = await supabase.from('trabajos').select('*').eq('estado','pendiente').order('creado_en',{ascending:true}).limit(1);
+  if (error) { console.error('Error leyendo trabajos:', error.message); return; }
+  if (data?.length) await procesarTrabajo(data[0]);
+}
+
+console.log('═══════════════════════════════════════════');
+console.log('🧠 IMPULSO IA — Worker de trabajos activo');
+console.log('   Vector fuente: NORMALIZACION de Google Sheets');
+console.log('   Motor científico: Supabase');
+console.log('   Escuchando tabla "trabajos" en Supabase');
+console.log('═══════════════════════════════════════════\n');
+
+revisarPendientes();
+setInterval(revisarPendientes, 5000);
