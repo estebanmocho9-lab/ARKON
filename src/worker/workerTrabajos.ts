@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 import { supabase } from '../supabase/client';
-import { syncMaterialesToSupabase, getVectorFromSupabase } from '../sheets/syncData';
+import { getVectorFromSheet } from '../sheets/syncData';
 
 interface CruceCientifico { nombre_cruce: string; propiedades_requeridas: string[]; formula: string; descripcion: string; problema: string; }
 interface ProblemaConfig { nombre_problema: string; cruces_activos: { nombreCruce: string; peso: number }[]; formula_global: string; descripcion: string; }
@@ -101,10 +101,9 @@ async function procesarTrabajo(trabajo: any): Promise<void> {
   console.log(`\n⚙️ Procesando trabajo ${id} — ${producto} (${contexto})`);
   await supabase.from('trabajos').update({ estado:'procesando', actualizado_en:new Date().toISOString() }).eq('id', id);
   try {
-    console.log('   📥 Sincronizando NORMALIZACION desde Google Sheets...');
-    await syncMaterialesToSupabase();
-    console.log(`   📊 Leyendo vector sincronizado de ${material_id}...`);
-    const vector = await getVectorFromSupabase(material_id);
+    // FUENTE ÚNICA DE VECTORES: Google Sheets / NORMALIZACION.
+    console.log('   📊 Leyendo vector REAL directamente desde NORMALIZACION...');
+    const vector = await getVectorFromSheet(material_id);
     if (!vector) throw new Error(`No se encontró el vector real de ${material_id} en NORMALIZACION`);
     const propConDatos = Object.values(vector).filter(v => v !== null && v !== undefined).length;
     console.log(`   📊 Vector real: ${propConDatos} propiedades con datos`);
@@ -140,7 +139,7 @@ async function revisarPendientes(): Promise<void> {
 console.log('═══════════════════════════════════════════');
 console.log('🧠 IMPULSO IA — Worker de trabajos activo');
 console.log('   Vector fuente: NORMALIZACION de Google Sheets');
-console.log('   Motor científico: Supabase');
+console.log('   Motor científico: Supabase (reglas/configuración, no vectores)');
 console.log('   Escuchando tabla "trabajos" en Supabase');
 console.log('═══════════════════════════════════════════\n');
 
