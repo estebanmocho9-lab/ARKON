@@ -1,11 +1,11 @@
 // ============================================================
 // src/core/activationEngine.ts
-// Neuronas sin datos se ignoran; los vectores provienen de
-// NORMALIZACION de Google Sheets mediante la copia sincronizada.
+// LÓGICA CLAVE: neuronas sin datos se ignoran, no bloquean el cálculo.
+// Los vectores se leen DIRECTAMENTE desde NORMALIZACION de Google Sheets.
 // ============================================================
 
 import { ALL_NEURONS, NEURON_MAP, NeuronOutput, NeuronInput } from '../neurons/index';
-import { getVectorFromSupabase } from '../sheets/syncData';
+import { getVectorFromSheet } from '../sheets/syncData';
 
 const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
   absorcion: ['absorption','porosity','permeability','diffusion','surface','chemical','pore'],
@@ -34,7 +34,8 @@ export interface ActivationResult {
 export async function activarNeuronas(materialId: string, contexto = 'general', estado?: string): Promise<ActivationResult> {
   console.log(`\n🧠 Activando neuronas — ${materialId} | contexto: ${contexto}${estado ? ` | estado: ${estado}` : ''}`);
 
-  const vector = await getVectorFromSupabase(materialId, estado);
+  // FUENTE ÚNICA: Google Sheets / NORMALIZACION.
+  const vector = await getVectorFromSheet(materialId, estado);
   if (!vector) {
     return {
       materialId, estado, neuronasActivadas: [], neuronasConDatos: 0, neuronasSinDatos: 0,
