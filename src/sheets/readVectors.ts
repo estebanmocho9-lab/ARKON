@@ -16,17 +16,28 @@ const MAPEO_HEADERS: Record<string, string> = {
   'volumen específico real':'volumen_especifico_real','volumen especifico real':'volumen_especifico_real','volumen específico aparente':'volumen_especifico_aparente','volumen especifico aparente':'volumen_especifico_aparente','compacidad':'compacidad','impermeabilidad':'impermeabilidad','índice de sólidos':'indice_solidos','indice de solidos':'indice_solidos','estrechez capilar':'estrechez_capilar','lisura geométrica':'lisura_geometrica','lisura geometrica':'lisura_geometrica','volumen esqueleto':'volumen_esqueleto','superficie específica blaine':'superficie_especifica_blaine','superficie especifica blaine':'superficie_especifica_blaine','rectitud flujo':'rectitud_flujo','deflectabilidad':'deflectabilidad','complacencia elástica':'complacencia_elastica','complacencia elastica':'complacencia_elastica','complacencia de cizalladura':'complacencia_cizalladura','compresibilidad':'compresibilidad','inv_cohesión':'inv_cohesion','inv_cohesion':'inv_cohesion','blandura':'blandura','coef. deslizamiento':'coef_deslizamiento','coef deslizamiento':'coef_deslizamiento','relación esbeltez':'relacion_esbeltez','relacion esbeltez':'relacion_esbeltez','resistividad térmica':'resistividad_termica','resistividad termica':'resistividad_termica','sensibilidad térmica':'sensibilidad_termica','sensibilidad termica':'sensibilidad_termica','contracción térmica':'contraccion_termica','contraccion termica':'contraccion_termica','temperatura de falla':'temperatura_falla','solidificación':'solidificacion','solidificacion':'solidificacion','retardo térmico':'retardo_termico','retardo termico':'retardo_termico','resistencia matriz':'resistencia_matriz','resistividad hidráulica':'resistividad_hidraulica','resistividad hidraulica':'resistividad_hidraulica','resistencia a difusión':'resistencia_difusion','resistencia a difusion':'resistencia_difusion','resistencia a gases':'resistencia_gases','resistencia iónica':'resistencia_ionica','resistencia ionica':'resistencia_ionica','resistividad eléctrica':'resistividad_electrica','resistividad electrica':'resistividad_electrica','poh':'poh','capacidad aniónica':'capacidad_anionica','capacidad anionica':'capacidad_anionica','desorción':'desorcion','desorcion':'desorcion','punto carga cero':'punto_carga_cero','estabilidad cohesiva':'estabilidad_cohesiva','coseno ángulo':'coseno_angulo','coseno angulo':'coseno_angulo','trabajo de cohesión':'trabajo_cohesion','trabajo de cohesion':'trabajo_cohesion','radio de debye':'radio_debye','actividad puzolánica':'actividad_puzolana','actividad puzolana':'actividad_puzolana','actividad puzolanica':'actividad_puzolana','contenido alúmina':'contenido_alumina','contenido alumina':'contenido_alumina','contenido férrico':'contenido_ferrico','contenido ferrico':'contenido_ferrico','cal libre':'cal_libre','magnesia':'magnesia','sosa':'sosa','potasa':'potasa','captura de carbono':'captura_carbono','energía recuperable':'energia_recuperable','energia recuperable':'energia_recuperable','no reciclable':'no_reciclable'
 };
 
-const COLUMNAS_NO_PROP = new Set(['id_material','estado','id_entidad']);
+const COLUMNAS_NO_PROP = new Set(['id_material','estado','id_entidad','material','id material']);
 let cache: MaterialVector[] | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
+function limpiarTexto(value: string): string {
+  return value.toString().replace(/[⚡✏️▶]/g, '').trim();
+}
+
+function normalizarClave(value: string): string {
+  return limpiarTexto(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^\w_]/g, '');
+}
+
+function normalizarEstado(value: string | undefined): string {
+  return limpiarTexto(value ?? '').toUpperCase().replace(/\s+/g, '');
+}
+
 function resolverNombreColumna(header: string): string | null {
-  const limpio = header.toLowerCase().trim().replace(/[⚡✏️▶]/g, '').trim();
+  const limpio = limpiarTexto(header).toLowerCase();
   if (COLUMNAS_NO_PROP.has(limpio)) return null;
   if (MAPEO_HEADERS[limpio]) return MAPEO_HEADERS[limpio];
-  const normalizado = limpio.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^\w_]/g, '');
-  return normalizado || null;
+  return normalizarClave(limpio) || null;
 }
 
 function parsearValor(raw: string | undefined): number | null {
@@ -40,43 +51,39 @@ function parsearValor(raw: string | undefined): number | null {
 export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
   const now = Date.now();
   if (cache && now - cacheTime < CACHE_TTL) return cache;
-
   try {
     const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'NORMALIZACION!A1:DZ' });
     const rows = response.data.values;
     if (!rows?.length) return [];
-
     let headerRowIndex = -1;
     for (let i = 0; i < Math.min(rows.length, 5); i++) {
-      const first = rows[i][0]?.toString().trim().toLowerCase();
-      if (['id_material','id_entidad','material','id material'].includes(first)) { headerRowIndex = i; break; }
+      const first = normalizarClave(rows[i][0]?.toString() ?? '');
+      if (['id_material','id_entidad','material','id_material'].includes(first)) { headerRowIndex = i; break; }
     }
     if (headerRowIndex < 0) return [];
-
     const headers = rows[headerRowIndex];
     const colMap = headers.map((h: any, i: number) => {
+      const key = normalizarClave(h?.toString() || '');
       if (i === 0) return '__ID__';
-      if (i === 1 && h?.toString().trim().toLowerCase() === 'estado') return '__ESTADO__';
+      if (key === 'estado') return '__ESTADO__';
       return resolverNombreColumna(h?.toString() || '');
     });
-
+    const estadoIndex = colMap.indexOf('__ESTADO__');
     const vectors: MaterialVector[] = [];
     for (let i = headerRowIndex + 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row?.[0]) continue;
-      const id = row[0].toString().trim();
+      const id = limpiarTexto(row[0].toString());
       if (!id || id === '#REF!' || id.startsWith('▶') || id.startsWith('🎯')) continue;
-
-      const estado = row[1]?.toString().trim() || 'Desconocido';
+      const estado = estadoIndex >= 0 ? limpiarTexto(row[estadoIndex]?.toString() || 'Desconocido') : 'E01';
       const propiedades: Record<string, number | null> = {};
-      for (let j = 2; j < colMap.length; j++) {
+      for (let j = 0; j < colMap.length; j++) {
         const colNombre = colMap[j];
         if (!colNombre || colNombre === '__ID__' || colNombre === '__ESTADO__') continue;
         propiedades[colNombre] = parsearValor(row[j]);
       }
       vectors.push({ materialId: id, estado, propiedades });
     }
-
     cache = vectors;
     cacheTime = now;
     console.log(`📊 NORMALIZACION: ${vectors.length} vectores reales leídos.`);
@@ -89,10 +96,17 @@ export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
 
 export async function getValorNormalizado(materialId: string, propiedad: string, estado?: string): Promise<number | null> {
   const vectors = await readVectorsFromSheet();
-  const material = estado
-    ? vectors.find(v => v.materialId === materialId && v.estado === estado)
-    : vectors.find(v => v.materialId === materialId);
+  const idBuscado = limpiarTexto(materialId).toUpperCase();
+  const estadoBuscado = estado ? normalizarEstado(estado) : '';
+  const candidatos = vectors.filter(v => limpiarTexto(v.materialId).toUpperCase() === idBuscado);
+  if (!candidatos.length) return null;
+  const material = estadoBuscado
+    ? candidatos.find(v => normalizarEstado(v.estado) === estadoBuscado) ?? candidatos[0]
+    : candidatos[0];
   if (!material) return null;
-  const propNorm = propiedad.toLowerCase().trim().replace(/\s+/g, '_');
-  return material.propiedades[propNorm] ?? material.propiedades[propiedad] ?? null;
+  const propNorm = normalizarClave(propiedad);
+  if (Object.prototype.hasOwnProperty.call(material.propiedades, propNorm)) return material.propiedades[propNorm] ?? null;
+  const alias = MAPEO_HEADERS[propiedad.toLowerCase().trim()];
+  if (alias && Object.prototype.hasOwnProperty.call(material.propiedades, alias)) return material.propiedades[alias] ?? null;
+  return null;
 }
