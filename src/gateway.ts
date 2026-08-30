@@ -32,6 +32,7 @@ async function proxyToArkon(req: express.Request, res: express.Response) {
         headers: {
           'content-type': 'application/json',
           ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
+          ...(req.headers['x-arkon-token'] ? { 'x-arkon-token': String(req.headers['x-arkon-token']) } : {}),
         },
         body,
       });
@@ -49,6 +50,11 @@ async function proxyToArkon(req: express.Request, res: express.Response) {
     }
   }
 }
+
+// Explicit public route for the integral diagnostic. This is intentionally
+// declared before the catch-all proxy so POST /api/analizar is guaranteed to
+// reach the real server.ts integral engine.
+app.post('/api/analizar', proxyToArkon);
 
 app.post('/api/neural-analysis', async (req, res) => {
   const { materialId, contexto = 'general', estado } = req.body ?? {};
