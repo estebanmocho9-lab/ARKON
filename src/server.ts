@@ -89,11 +89,9 @@ app.get('/api/products/:id', async (req, res) => {
 
 /**
  * Análisis REAL consumido por Impulso Vector.
- *
- * Este endpoint existía en el contrato de la aplicación, pero ARKON no lo
- * exponía en el servidor interno; el gateway terminaba devolviendo el HTML
- * estático y el cliente recibía "Unexpected token '<'". Ahora resolvemos el
- * producto en Supabase, validamos su material_id real y ejecutamos el motor.
+ * Este endpoint completa el contrato entre la aplicación y ARKON: resuelve
+ * el producto real, toma productos.material_id, valida NORMALIZACION y
+ * ejecuta el motor sin datos ficticios.
  */
 app.post('/api/analizar', async (req, res) => {
   try {
@@ -133,20 +131,15 @@ app.post('/api/analizar', async (req, res) => {
       : 'general';
     const estado = typeof req.body?.estado === 'string' ? req.body.estado : undefined;
 
-    // Primero activamos las neuronas para obtener cobertura, valores reales,
-    // anomalías e índices intermedios. Esta ruta siempre lee NORMALIZACION.
+    // Activación real: cobertura, valores normalizados, anomalías e índices.
     const activacion = await activarNeuronas(materialId, contexto, estado);
 
-    // Después intentamos el análisis científico global configurado en Supabase.
-    // Si el contexto no coincide con un problema configurado, no inventamos uno:
-    // simplemente devolvemos la activación real y dejamos el análisis global nulo.
-    let problemaAnalizado: any = null;
+    // Análisis científico global: solamente si existe un problema configurado
+    // en Supabase con el mismo nombre que el contexto. Para "general" usamos
+    // fragilidad solo si esa configuración existe; nunca se inventa un cálculo.
+    let problemaAnalizado: string | null = null;
     let inferencia: any = null;
-    const { data: problemas } = await supabase
-      .from('problemas')
-      .select('nombre_problema')
-      .eq('activo', true);
-
+    const { data: problemas } = await supabase.from('problemas').select('nombre_problema');
     const candidatos = (problemas ?? []).map((p: any) => String(p.nombre_problema)).filter(Boolean);
     const nombreProblema = candidatos.find(nombre => nombre.toLowerCase() === contexto)
       ?? (contexto === 'general' ? candidatos.find(nombre => nombre.toLowerCase() === 'fragilidad') : undefined);
@@ -173,15 +166,14 @@ app.post('/api/analizar', async (req, res) => {
       ...activacion.propiedadesPendientes.map(prop => `Sin dato real en NORMALIZACION: ${prop}`),
     ];
 
-    // Las mejoras salen de las reglas científicas persistidas; si no existen,
-    // no se fabrica una recomendación.
     const mejoras: any[] = [];
     for (const neuron of activacion.neuronasActivadas) {
       try {
-        const reglas = await (ALL_NEURONS.find(n => n.propertyName === neuron.propertyName) as any)?.consultarMejoras?.(neuron.valorCompuesto);
+        const instancia: any = ALL_NEURONS.find(n => n.propertyName === neuron.propertyName);
+        const reglas = await instancia?.consultarMejoras?.(neuron.valorCompuesto);
         if (Array.isArray(reglas)) mejoras.push(...reglas);
       } catch {
-        // Una tabla/regla opcional no debe invalidar el análisis real.
+        // Las reglas de mejora son opcionales y no deben romper el análisis.
       }
     }
 
