@@ -8,7 +8,7 @@ async function main() {
   console.log('========================================\n');
 
   const input: NeuronInput = {
-    materialId: 'MA.001',
+    materialId: 'M.001',
     estado: 'E01',
     valorDirecto: 72.5
   };
