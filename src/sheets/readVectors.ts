@@ -33,6 +33,10 @@ function normalizarEstado(value: string | undefined): string {
   return limpiarTexto(value ?? '').toUpperCase().replace(/\s+/g, '');
 }
 
+function normalizarMaterialId(value: string): string {
+  return limpiarTexto(value).replace(/^material[_\s-]*/i, '').toUpperCase();
+}
+
 function resolverNombreColumna(header: string): string | null {
   const limpio = limpiarTexto(header).toLowerCase();
   if (COLUMNAS_NO_PROP.has(limpio)) return null;
@@ -54,13 +58,28 @@ export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
   try {
     const response = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'NORMALIZACION!A1:DZ' });
     const rows = response.data.values;
-    if (!rows?.length) return [];
-    let headerRowIndex = -1;
-    for (let i = 0; i < Math.min(rows.length, 5); i++) {
-      const first = normalizarClave(rows[i][0]?.toString() ?? '');
-      if (['id_material','id_entidad','material','id_material'].includes(first)) { headerRowIndex = i; break; }
+    if (!rows?.length) {
+      console.warn('⚠️ NORMALIZACION está vacía o no devolvió filas.');
+      return [];
     }
-    if (headerRowIndex < 0) return [];
+
+    // No suponemos que el encabezado esté exactamente en la primera fila:
+    // buscamos una fila que realmente describa ID + estado dentro de las primeras 30 filas.
+    let headerRowIndex = -1;
+    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+      const first = normalizarClave(String(rows[i]?.[0] ?? ''));
+      const hasId = ['id_material', 'id_entidad', 'material', 'idmaterial'].includes(first);
+      const hasEstado = rows[i]?.some((cell: any) => normalizarClave(String(cell ?? '')) === 'estado');
+      if (hasId || (first.includes('material') && hasEstado)) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+    if (headerRowIndex < 0) {
+      console.error(`❌ NORMALIZACION: no se encontró encabezado de ID material en las primeras ${Math.min(rows.length, 30)} filas.`);
+      return [];
+    }
+
     const headers = rows[headerRowIndex];
     const colMap = headers.map((h: any, i: number) => {
       const key = normalizarClave(h?.toString() || '');
@@ -70,23 +89,28 @@ export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
     });
     const estadoIndex = colMap.indexOf('__ESTADO__');
     const vectors: MaterialVector[] = [];
+
     for (let i = headerRowIndex + 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row?.[0]) continue;
-      const id = limpiarTexto(row[0].toString());
+      const id = limpiarTexto(String(row[0]));
       if (!id || id === '#REF!' || id.startsWith('▶') || id.startsWith('🎯')) continue;
-      const estado = estadoIndex >= 0 ? limpiarTexto(row[estadoIndex]?.toString() || 'Desconocido') : 'E01';
+      const estado = estadoIndex >= 0 ? limpiarTexto(String(row[estadoIndex] ?? 'Desconocido')) : 'E01';
       const propiedades: Record<string, number | null> = {};
       for (let j = 0; j < colMap.length; j++) {
         const colNombre = colMap[j];
         if (!colNombre || colNombre === '__ID__' || colNombre === '__ESTADO__') continue;
         propiedades[colNombre] = parsearValor(row[j]);
       }
-      vectors.push({ materialId: id, estado, propiedades });
+      vectors.push({ materialId: normalizarMaterialId(id), estado, propiedades });
     }
+
     cache = vectors;
     cacheTime = now;
     console.log(`📊 NORMALIZACION: ${vectors.length} vectores reales leídos.`);
+    if (vectors.length > 0) {
+      console.log(`📊 NORMALIZACION: primeros IDs: ${vectors.slice(0, 8).map(v => v.materialId).join(', ')}`);
+    }
     return vectors;
   } catch (error: any) {
     console.error('❌ Error leyendo NORMALIZACION:', error?.message || error);
@@ -96,9 +120,9 @@ export async function readVectorsFromSheet(): Promise<MaterialVector[]> {
 
 export async function getValorNormalizado(materialId: string, propiedad: string, estado?: string): Promise<number | null> {
   const vectors = await readVectorsFromSheet();
-  const idBuscado = limpiarTexto(materialId).toUpperCase();
+  const idBuscado = normalizarMaterialId(materialId);
   const estadoBuscado = estado ? normalizarEstado(estado) : '';
-  const candidatos = vectors.filter(v => limpiarTexto(v.materialId).toUpperCase() === idBuscado);
+  const candidatos = vectors.filter(v => normalizarMaterialId(v.materialId) === idBuscado);
   if (!candidatos.length) return null;
   const material = estadoBuscado
     ? candidatos.find(v => normalizarEstado(v.estado) === estadoBuscado) ?? candidatos[0]
