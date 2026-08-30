@@ -1,10 +1,11 @@
 // ============================================================
 // src/core/activationEngine.ts
-// LÓGICA CLAVE: neuronas sin datos se ignoran, no bloquean el cálculo.
-// Los vectores se leen DIRECTAMENTE desde NORMALIZACION de Google Sheets.
+// Activa las neuronas usando vectores reales de NORMALIZACION.
+// El estado solicitado se propaga hasta cada neurona para evitar
+// mezclar valores de estados físicos diferentes.
 // ============================================================
 
-import { ALL_NEURONS, NEURON_MAP, NeuronOutput, NeuronInput } from '../neurons/index';
+import { ALL_NEURONS, NeuronOutput, NeuronInput } from '../neurons/index';
 import { getVectorFromSheet } from '../sheets/syncData';
 
 const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
@@ -35,6 +36,7 @@ export async function activarNeuronas(materialId: string, contexto = 'general', 
   console.log(`\n🧠 Activando neuronas — ${materialId} | contexto: ${contexto}${estado ? ` | estado: ${estado}` : ''}`);
 
   // FUENTE ÚNICA: Google Sheets / NORMALIZACION.
+  // Si se solicita un estado, la fila exacta de ese estado es la única aceptada.
   const vector = await getVectorFromSheet(materialId, estado);
   if (!vector) {
     return {
@@ -68,13 +70,19 @@ export async function activarNeuronas(materialId: string, contexto = 'general', 
 
     const input: NeuronInput = {
       materialId,
-      estado: estado ?? 'E01',
+      estado: (estado as NeuronInput['estado']) ?? 'E01',
       valorDirecto: valorNormalizado as number,
       contexto: contextoNeural
     };
 
     try {
-      resultados.push(await neurona.process(input));
+      const output = await neurona.process(input);
+      if (output.propiedadPendiente) {
+        neuronasSinDatos++;
+        propiedadesPendientes.push(`${prop} [pendiente]`);
+        continue;
+      }
+      resultados.push(output);
       neuronasConDatos++;
     } catch (err) {
       console.error(`⚠️ Neurona ${neurona.neuronId} (${prop}) falló:`, err);
