@@ -6,7 +6,7 @@
 
 import { ALL_NEURONS, NEURON_MAP, NeuronOutput, NeuronInput } from '../neurons/index';
 import { EstadoMaterial } from '../neurons/base/tipos';
-import { getVectorFromSheet } from '../sheets/syncData';
+import { getRealVector } from '../sheets/realVectors';
 
 const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
   absorcion: ['absorption','porosity','permeability','diffusion','surface','chemical','pore'],
@@ -26,13 +26,6 @@ const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
 const UMBRAL_CONFIANZA_MINIMO = 0.15;
 const ESTADOS_LOGICOS = new Set<EstadoMaterial>(['E01', 'E02', 'E03']);
 
-/**
- * NORMALIZACION tiene una columna Estado propia (por ejemplo Polvo,
- * Componente, Fraguado). Ese estado se usa para seleccionar la fila del
- * vector. NeuronInput, en cambio, usa el estado lógico E01/E02/E03.
- * Si el gateway no recibe un estado lógico, mantenemos E01 sin inventar
- * una conversión entre las dos taxonomías.
- */
 function normalizarEstadoNeural(estado?: string): EstadoMaterial {
   return estado && ESTADOS_LOGICOS.has(estado as EstadoMaterial)
     ? estado as EstadoMaterial
@@ -50,7 +43,7 @@ export async function activarNeuronas(materialId: string, contexto = 'general', 
   console.log(`\n🧠 Activando neuronas — ${materialId} | contexto: ${contexto}${estado ? ` | estado: ${estado}` : ''}`);
 
   // FUENTE ÚNICA: Google Sheets / NORMALIZACION.
-  const vector = await getVectorFromSheet(materialId, estado);
+  const vector = await getRealVector(materialId, estado);
   if (!vector) {
     return {
       materialId, estado, neuronasActivadas: [], neuronasConDatos: 0, neuronasSinDatos: 0,
