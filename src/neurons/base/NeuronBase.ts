@@ -7,12 +7,8 @@ import { supabase } from '../../supabase/client';
 import { evaluarExpresion, sumaPonderada } from '../../utils/mathHelpers';
 import { ComponenteBase, NeuronInput, NeuronOutput, EstadoMaterial } from './tipos';
 export type { NeuronInput, NeuronOutput, EstadoMaterial, ComponenteBase };
-import { getValorNormalizado } from '../../sheets/readVectors'; // lee NORMALIZACION
+import { getValorNormalizado } from '../../sheets/readVectors';
 
-// ── FLAG GLOBAL ANTI-LOOP ─────────────────────────────────────
-// Rastrea qué neuronas están siendo procesadas en este momento.
-// Si calcularIndicesIntermedios intenta llamar a una neurona que
-// ya está en proceso, la omite en lugar de crear recursión infinita.
 const _neuronasEnProceso = new Set<string>();
 
 export abstract class NeuronBase {
@@ -31,7 +27,6 @@ export abstract class NeuronBase {
   readonly formulaMezclaPersonalizada?: string;
   readonly metodoInversoPersonalizado?: string;
 
-  // ── MÉTODO PRINCIPAL ─────────────────────────────────────────
   async process(input: NeuronInput): Promise<NeuronOutput> {
     const startTime = Date.now();
     try {
@@ -44,13 +39,11 @@ export abstract class NeuronBase {
       if (input.valorDirecto !== undefined && input.valorDirecto !== null) {
         valorCompuesto = Math.min(100, Math.max(0, input.valorDirecto));
         componentesUsados = 1;
-
       } else if (input.componentes && input.componentes.length > 0) {
         const result = await this.calcularDesdeComponentes(input);
         valorCompuesto = result.valor;
         componentesUsados = result.componentesConDato;
         anomalias.push(...result.anomalias);
-
       } else {
         const valorSheet = await getValorNormalizado(input.materialId, this.propertyName);
         if (valorSheet !== null && !isNaN(valorSheet)) {
@@ -61,8 +54,6 @@ export abstract class NeuronBase {
         }
       }
 
-      // ── ÍNDICES INTERMEDIOS ──────────────────────────────────
-      // Solo si esta neurona NO está ya en proceso (anti-loop)
       if (!_neuronasEnProceso.has(this.propertyName)) {
         _neuronasEnProceso.add(this.propertyName);
         try {
@@ -72,7 +63,6 @@ export abstract class NeuronBase {
         }
       }
 
-      // ── TIPO DEL MATERIAL ────────────────────────────────────
       const matInfo = await this.obtenerTipoMaterial(input.materialId);
       if (matInfo.tipo) materialTipo = matInfo.tipo;
 
@@ -107,10 +97,7 @@ export abstract class NeuronBase {
     }
   }
 
-  // ── MEZCLA DESDE COMPONENTES ─────────────────────────────────
-  private async calcularDesdeComponentes(input: NeuronInput): Promise<{
-    valor: number; componentesConDato: number; anomalias: string[]
-  }> {
+  private async calcularDesdeComponentes(input: NeuronInput): Promise<{ valor: number; componentesConDato: number; anomalias: string[] }> {
     const componentes = input.componentes!;
     const { tipo: tipoMat } = await this.obtenerTipoMaterial(input.materialId);
     const regla = await this.obtenerReglaMezcla(tipoMat ?? undefined);
@@ -124,14 +111,11 @@ export abstract class NeuronBase {
         continue;
       }
       let valorFinal = valor;
-      if (input.estado && input.estado !== 'E01') {
-        valorFinal = await this.aplicarTransformacionEstado(valorFinal, comp.materialId);
-      }
+      if (input.estado && input.estado !== 'E01') valorFinal = await this.aplicarTransformacionEstado(valorFinal, comp.materialId);
       items.push({ fraccion: comp.fraccion, valor: valorFinal });
     }
 
     if (items.length === 0) throw new Error(`Ningún componente tiene dato en Sheet para ${this.propertyName}`);
-
     const fraccionTotal = items.reduce((s, i) => s + i.fraccion, 0);
     const fraccionesNorm = items.map(i => i.fraccion / fraccionTotal);
     const valores = items.map(i => i.valor);
@@ -144,23 +128,17 @@ export abstract class NeuronBase {
       anomalias.push(`error_formula_mezcla:${err.message}`);
       valorCompuesto = sumaPonderada(fraccionesNorm, valores);
     }
-
     return { valor: valorCompuesto, componentesConDato: items.length, anomalias };
   }
 
-  // ── REGLA DE MEZCLA ──────────────────────────────────────────
   private async obtenerReglaMezcla(materialTipo?: string): Promise<{ formula: string }> {
     if (materialTipo) {
-      const { data: dataEsp } = await supabase
-        .from('reglas_mezcla').select('formula')
-        .eq('propiedad_nombre', this.propertyName).eq('activo', true)
-        .eq('tipo_material_aplica', materialTipo).limit(1).maybeSingle();
+      const { data: dataEsp } = await supabase.from('reglas_mezcla').select('formula')
+        .eq('propiedad_nombre', this.propertyName).eq('activo', true).eq('tipo_material_aplica', materialTipo).limit(1).maybeSingle();
       if (dataEsp) return { formula: dataEsp.formula };
     }
-    const { data, error } = await supabase
-      .from('reglas_mezcla').select('formula')
-      .eq('propiedad_nombre', this.propertyName).eq('activo', true)
-      .limit(1).single();
+    const { data, error } = await supabase.from('reglas_mezcla').select('formula')
+      .eq('propiedad_nombre', this.propertyName).eq('activo', true).limit(1).single();
     if (error || !data) return { formula: 'ponderada_lineal' };
     return { formula: data.formula };
   }
@@ -170,41 +148,30 @@ export abstract class NeuronBase {
     return evaluarExpresion(formula, { fracciones, valores });
   }
 
-  // ── TRANSFORMACIÓN DE ESTADO ─────────────────────────────────
   private async aplicarTransformacionEstado(valorInicial: number, materialId: string): Promise<number> {
     const { familia } = await this.obtenerTipoMaterial(materialId);
     if (familia) {
-      const { data: dataF } = await supabase
-        .from('transformaciones_estado').select('factor_multiplicador, formula_avanzada')
-        .eq('propiedad_nombre', this.propertyName).eq('activo', true)
-        .eq('material_familia', familia).maybeSingle();
+      const { data: dataF } = await supabase.from('transformaciones_estado').select('factor_multiplicador, formula_avanzada')
+        .eq('propiedad_nombre', this.propertyName).eq('activo', true).eq('material_familia', familia).maybeSingle();
       if (dataF) return this.aplicarFactorTransformacion(dataF, valorInicial);
     }
-    const { data, error } = await supabase
-      .from('transformaciones_estado').select('factor_multiplicador, formula_avanzada')
+    const { data, error } = await supabase.from('transformaciones_estado').select('factor_multiplicador, formula_avanzada')
       .eq('propiedad_nombre', this.propertyName).eq('activo', true).maybeSingle();
     if (error || !data) return valorInicial;
     return this.aplicarFactorTransformacion(data, valorInicial);
   }
 
-  private aplicarFactorTransformacion(
-    data: { factor_multiplicador: number | null; formula_avanzada: string | null },
-    valorInicial: number
-  ): number {
+  private aplicarFactorTransformacion(data: { factor_multiplicador: number | null; formula_avanzada: string | null }, valorInicial: number): number {
     if (data.formula_avanzada) {
-      try { return evaluarExpresion(data.formula_avanzada, { valor: valorInicial }); }
-      catch { return valorInicial; }
+      try { return evaluarExpresion(data.formula_avanzada, { valor: valorInicial }); } catch { return valorInicial; }
     } else if (data.factor_multiplicador) {
       return Math.min(100, Math.max(0, valorInicial * data.factor_multiplicador));
     }
     return valorInicial;
   }
 
-  // ── INVERSO ───────────────────────────────────────────────────
   private async calcularInverso(valorDirecto: number): Promise<{ inverso: number; metodoUsado: string }> {
-    const { data } = await supabase
-      .from('propiedades').select('metodo_inverso, params_inverso')
-      .eq('nombre', this.propertyName).maybeSingle();
+    const { data } = await supabase.from('propiedades').select('metodo_inverso, params_inverso').eq('nombre', this.propertyName).maybeSingle();
     const metodo = data?.metodo_inverso || 'complemento_100';
     const params = data?.params_inverso || {};
     let inverso = 50;
@@ -219,7 +186,6 @@ export abstract class NeuronBase {
     return { inverso, metodoUsado: metodo };
   }
 
-  // ── CONSISTENCIA ─────────────────────────────────────────────
   private verificarConsistencia(directo: number, inverso: number, metodo: string): string[] {
     const anomalias: string[] = [];
     if (metodo === 'complemento_100') {
@@ -231,12 +197,7 @@ export abstract class NeuronBase {
     return anomalias;
   }
 
-  // ── MEMORIA ───────────────────────────────────────────────────
-  private async guardarMemoria(
-    input: NeuronInput, compuesto: number, inverso: number,
-    anomalias: string[], componentesUsados: number,
-    indicesIntermedios: Record<string, number> = {}
-  ) {
+  private async guardarMemoria(input: NeuronInput, compuesto: number, inverso: number, anomalias: string[], componentesUsados: number, indicesIntermedios: Record<string, number> = {}) {
     await supabase.from('memoria_neuronas').insert({
       neurona_id: this.neuronId,
       propiedad_nombre: this.propertyName,
@@ -251,54 +212,30 @@ export abstract class NeuronBase {
     });
   }
 
-  // ── OUTPUT VACÍO ──────────────────────────────────────────────
   private outputVacio(input: NeuronInput, razon: string): NeuronOutput {
     console.warn(`  ⏳ [${this.neuronId}] PENDIENTE — ${razon}`);
     return {
-      neuronId: this.neuronId,
-      propertyName: this.propertyName,
-      materialId: input.materialId,
-      estado: input.estado,
-      valorCompuesto: 50,
-      valorInverso: 50,
-      confianza: 0,
-      anomalias: [razon],
-      propiedadPendiente: true,
-      metadatos: {},
-      indicesIntermedios: {},
-      materialTipo: undefined
+      neuronId: this.neuronId, propertyName: this.propertyName, materialId: input.materialId,
+      estado: input.estado, valorCompuesto: 50, valorInverso: 50, confianza: 0,
+      anomalias: [razon], propiedadPendiente: true, metadatos: {}, indicesIntermedios: {}, materialTipo: undefined
     };
   }
 
-  // ── TIPO DE MATERIAL ─────────────────────────────────────────
-  private async obtenerTipoMaterial(materialId: string): Promise<{
-    tipo: string | null; familia: string | null;
-  }> {
+  private async obtenerTipoMaterial(materialId: string): Promise<{ tipo: string | null; familia: string | null }> {
     try {
-      const { data, error } = await supabase
-        .from('catalogo_materiales').select('tipo, familia')
-        .eq('id_material', materialId).maybeSingle();
+      const { data, error } = await supabase.from('catalogo_materiales').select('tipo, familia').eq('id_material', materialId).maybeSingle();
       if (error || !data) return { tipo: null, familia: null };
       return { tipo: data.tipo ?? null, familia: data.familia ?? null };
-    } catch {
-      return { tipo: null, familia: null };
-    }
+    } catch { return { tipo: null, familia: null }; }
   }
 
-  // ── ÍNDICES INTERMEDIOS ───────────────────────────────────────
-  protected async calcularIndicesIntermedios(
-    input: NeuronInput,
-    valorPropio: number
-  ): Promise<Record<string, number>> {
+  protected async calcularIndicesIntermedios(input: NeuronInput, valorPropio: number): Promise<Record<string, number>> {
     const indices: Record<string, number> = {};
-
     let NEURON_MAP: Record<string, NeuronBase>;
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       NEURON_MAP = require('../index').NEURON_MAP;
-    } catch {
-      return indices;
-    }
+    } catch { return indices; }
 
     const formulas = await this.consultarFormulas();
     if (formulas.length === 0) return indices;
@@ -306,88 +243,70 @@ export abstract class NeuronBase {
     for (const formula of formulas) {
       try {
         const fc = formula.forma_computable?.trim();
-        if (!fc) continue;
-        if (formula.propiedad_a === 'ninguna') continue;
+        if (!fc || formula.propiedad_a === 'ninguna') continue;
         if (fc.includes('for ') || fc.includes('sum(') || fc.startsWith('#')) continue;
 
-        const scope: Record<string, number> = {};
-        scope[this.propertyName] = valorPropio;
-
-        const otraPropiedad =
-          formula.propiedad_a === this.propertyName
-            ? formula.propiedad_b
-            : formula.propiedad_a;
+        const scope: Record<string, number> = { [this.propertyName]: valorPropio };
+        const otraPropiedad = formula.propiedad_a === this.propertyName ? formula.propiedad_b : formula.propiedad_a;
 
         if (otraPropiedad && otraPropiedad !== 'ninguna') {
-          if (_neuronasEnProceso.has(otraPropiedad)) {
-            // La otra neurona está en proceso → usar contexto si existe
-            const valorCtx = (input.contexto as any)?.[otraPropiedad];
-            if (valorCtx !== undefined && valorCtx !== null) {
-              scope[otraPropiedad] = valorCtx;
-            } else {
-              continue; // No tenemos el valor → omitir fórmula
-            }
+          // PRIORIDAD 1: el activationEngine ya leyó el vector real y lo pasó
+          // en contexto. Esto evita que una neurona relacionada reutilice por
+          // error el valorDirecto de la neurona actual.
+          const valorCtx = (input.contexto as any)?.[otraPropiedad];
+          if (valorCtx !== undefined && valorCtx !== null && Number.isFinite(Number(valorCtx))) {
+            scope[otraPropiedad] = Number(valorCtx);
+          } else if (_neuronasEnProceso.has(otraPropiedad)) {
+            continue;
           } else if (NEURON_MAP[otraPropiedad]) {
             _neuronasEnProceso.add(otraPropiedad);
             try {
-              const otraOutput = await NEURON_MAP[otraPropiedad].process(input);
-              if (!otraOutput.propiedadPendiente) {
-                scope[otraPropiedad] = otraOutput.valorCompuesto;
-              }
+              // Esta ruta es un fallback para entradas que no traen contexto.
+              // La neurona relacionada vuelve a leer su propio valor desde
+              // NORMALIZACION cuando no recibe valorDirecto.
+              const otraInput: NeuronInput = { ...input, valorDirecto: undefined };
+              const otraOutput = await NEURON_MAP[otraPropiedad].process(otraInput);
+              if (!otraOutput.propiedadPendiente) scope[otraPropiedad] = otraOutput.valorCompuesto;
             } finally {
               _neuronasEnProceso.delete(otraPropiedad);
             }
           }
         }
 
-        // Extraer lado derecho del "="
         let expresion = fc;
         const eqIndex = fc.indexOf('=');
-        if (eqIndex !== -1 &&
-          !fc.substring(0, eqIndex).includes('!') &&
-          !fc.substring(0, eqIndex).includes('<') &&
-          !fc.substring(0, eqIndex).includes('>')) {
+        if (eqIndex !== -1 && !fc.substring(0, eqIndex).includes('!') && !fc.substring(0, eqIndex).includes('<') && !fc.substring(0, eqIndex).includes('>')) {
           expresion = fc.substring(eqIndex + 1).trim();
         }
 
         const resultado = evaluarExpresion(expresion, scope);
-
         if (!isNaN(resultado) && isFinite(resultado)) {
-          const clave = (formula.output_nombre || formula.id)
-            .toLowerCase().replace(/\s+/g, '_')
-            .replace(/[éèê]/g, 'e').replace(/[áàâ]/g, 'a')
-            .replace(/[íìî]/g, 'i').replace(/[óòô]/g, 'o')
-            .replace(/[úùû]/g, 'u').replace(/[^a-z0-9_]/g, '');
+          const clave = (formula.output_nombre || formula.id).toLowerCase().replace(/\s+/g, '_')
+            .replace(/[éèê]/g, 'e').replace(/[áàâ]/g, 'a').replace(/[íìî]/g, 'i')
+            .replace(/[óòô]/g, 'o').replace(/[úùû]/g, 'u').replace(/[^a-z0-9_]/g, '');
           indices[clave] = Math.round(resultado * 1000) / 1000;
         }
       } catch {
-        // Silencioso: fórmulas con constantes externas fallan esperablemente
+        // Una fórmula que requiera variables ausentes no contamina el resultado.
       }
     }
-
     return indices;
   }
-
-  // ── CONSULTAS PÚBLICAS A SUPABASE ─────────────────────────────
 
   async consultarFormulas(): Promise<{
     id: string; nombre: string; descripcion: string; ecuacion: string;
     forma_computable: string; propiedad_a: string; propiedad_b: string;
-    tipo_relacion: string; output_nombre: string;
-    peso_cientifico: number; confianza: number;
+    tipo_relacion: string; output_nombre: string; peso_cientifico: number; confianza: number;
   }[]> {
-    const { data, error } = await supabase
-      .from('scientific_formulas')
-      .select('id, nombre, descripcion, ecuacion, forma_computable, propiedad_a, propiedad_b, tipo_relacion, output_nombre, peso_cientifico, confianza')
-      .or(`propiedad_a.eq.${this.propertyName},propiedad_b.eq.${this.propertyName}`)
-      .order('peso_cientifico', { ascending: false });
+    const { data, error } = await supabase.from('scientific_formulas').select(
+      'id, nombre, descripcion, ecuacion, forma_computable, propiedad_a, propiedad_b, tipo_relacion, output_nombre, peso_cientifico, confianza'
+    ).or(`propiedad_a.eq.${this.propertyName},propiedad_b.eq.${this.propertyName}`).order('peso_cientifico', { ascending: false });
     if (error || !data) return [];
     return data as any[];
   }
 
   async consultarTriz(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('triz_contradicciones').select('*').eq('activo', true);
+    const { data, error } = await supabase.from('triz_contradicciones').select('*').eq('activo', true);
     if (error || !data) return [];
     return data.filter((row: any) => {
       const m = Array.isArray(row.propiedades_mejora) ? row.propiedades_mejora : JSON.parse(row.propiedades_mejora || '[]');
@@ -397,8 +316,7 @@ export abstract class NeuronBase {
   }
 
   async consultarMejoras(valorActual: number): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('reglas_mejora').select('id, neurona_id, condicion, solucion, prioridad')
+    const { data, error } = await supabase.from('reglas_mejora').select('id, neurona_id, condicion, solucion, prioridad')
       .eq('neurona_id', this.neuronId).order('prioridad', { ascending: true });
     if (error || !data) return [];
     return data.filter((regla: any) => {
