@@ -1,28 +1,23 @@
 import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
 import { MotorInferencia } from './src/inference/MotorInferencia';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_KEY!
-);
 
 async function main() {
   const motor = new MotorInferencia();
 
+  // M.001 es el ID real presente en NORMALIZACION (Talco industrial en polvo).
   const input = {
-    materialId: 'MA.001', // Yeso
-    estado: 'E01', // estado comercial/polvo
+    materialId: 'M.001',
+    estado: 'E01',
     componentes: [],
   };
 
-  console.log('\n?? ANALIZANDO FRAGILIDAD del material MA.001 (Yeso)');
+  console.log('\n🔬 ANALIZANDO FRAGILIDAD del material M.001 (Talco industrial)');
   const resultadoFragilidad = await motor.analizarProblema('fragilidad', input);
   console.log('Resultado fragilidad:', resultadoFragilidad);
 
-  console.log('\n?? ANALIZANDO ABSORCI�N del material MA.001');
+  console.log('\n🔬 ANALIZANDO ABSORCIÓN del material M.001');
   const resultadoAbsorcion = await motor.analizarProblema('absorcion', input);
-  console.log('Resultado absorci�n:', resultadoAbsorcion);
+  console.log('Resultado absorción:', resultadoAbsorcion);
 }
 
 main().catch(console.error);
