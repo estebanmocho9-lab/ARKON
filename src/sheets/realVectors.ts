@@ -1,5 +1,6 @@
 import { sheets, SPREADSHEET_ID } from './sheetsConnection';
 import { ALL_NEURONS } from '../neurons/index';
+import { createClient } from '@supabase/supabase-js';
 
 export interface RealMaterialVector {
   materialId: string;
@@ -82,6 +83,51 @@ export function clearRealVectorCache(): void {
   cacheTime = 0;
 }
 
+async function readRealVectorsFromSupabase(): Promise<RealMaterialVector[]> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+  if (!url || !key) {
+    console.warn('⚠️ Fallback Supabase no disponible: faltan SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY.');
+    return [];
+  }
+
+  try {
+    const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await supabase
+      .from('materiales_vectores')
+      .select('*');
+
+    if (error) {
+      console.error('❌ Error leyendo materiales_vectores desde Supabase:', error.message);
+      return [];
+    }
+
+    const vectors: RealMaterialVector[] = [];
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const materialId = normalizeMaterialId(row.id_material);
+      if (!/^M\.\d+$/i.test(materialId)) continue;
+
+      const estado = clean(row.estado) || 'Desconocido';
+      const propiedades: Record<string, number | null> = {};
+
+      for (const [header, value] of Object.entries(row)) {
+        if (header === 'id_material' || header === 'estado' || header === 'actualizado_en') continue;
+        const property = propertyNameForHeader(header);
+        if (!property) continue;
+        propiedades[property] = parseNumber(value);
+      }
+
+      vectors.push({ materialId, estado, propiedades });
+    }
+
+    console.log(`📊 SUPABASE materiales_vectores: ${vectors.length} vectores reales leídos.`);
+    return vectors;
+  } catch (error: any) {
+    console.error('❌ Error en fallback Supabase:', error?.message || error);
+    return [];
+  }
+}
+
 export async function readRealVectors(): Promise<RealMaterialVector[]> {
   const now = Date.now();
   if (cache && now - cacheTime < CACHE_TTL) return cache;
@@ -93,7 +139,14 @@ export async function readRealVectors(): Promise<RealMaterialVector[]> {
     });
     const rows = response.data.values as unknown[][] | undefined;
     if (!rows?.length) {
-      console.error('❌ NORMALIZACION no devolvió filas.');
+      console.warn('⚠️ NORMALIZACION no devolvió filas. Intentando materiales_vectores de Supabase.');
+      const fallback = await readRealVectorsFromSupabase();
+      if (fallback.length) {
+        cache = fallback;
+        cacheTime = now;
+        return fallback;
+      }
+      console.error('❌ No hay vectores reales disponibles ni en NORMALIZACION ni en materiales_vectores.');
       return [];
     }
 
@@ -113,7 +166,6 @@ export async function readRealVectors(): Promise<RealMaterialVector[]> {
       }
     }
 
-    // Segundo intento: si la hoja tiene ID pero no una columna Estado, también es válida.
     if (headerRow < 0) {
       for (let i = 0; i < Math.min(rows.length, 50); i++) {
         const ids = rows[i].map(cell => canonical(cell));
@@ -128,6 +180,13 @@ export async function readRealVectors(): Promise<RealMaterialVector[]> {
     }
 
     if (headerRow < 0 || idIndex < 0) {
+      console.warn('⚠️ NORMALIZACION no tiene una columna ID reconocible. Intentando materiales_vectores de Supabase.');
+      const fallback = await readRealVectorsFromSupabase();
+      if (fallback.length) {
+        cache = fallback;
+        cacheTime = now;
+        return fallback;
+      }
       console.error('❌ NORMALIZACION: no se encontró columna ID material.');
       console.error(`   Filas recibidas: ${rows.length}. Primera fila: ${JSON.stringify(rows[0]?.slice(0, 12) ?? [])}`);
       return [];
@@ -154,6 +213,16 @@ export async function readRealVectors(): Promise<RealMaterialVector[]> {
       vectors.push({ materialId: id, estado, propiedades });
     }
 
+    if (!vectors.length) {
+      console.warn('⚠️ NORMALIZACION no contiene vectores M.xxx. Intentando materiales_vectores de Supabase.');
+      const fallback = await readRealVectorsFromSupabase();
+      if (fallback.length) {
+        cache = fallback;
+        cacheTime = now;
+        return fallback;
+      }
+    }
+
     cache = vectors;
     cacheTime = now;
     const ids = [...new Set(vectors.map(v => v.materialId))];
@@ -161,7 +230,13 @@ export async function readRealVectors(): Promise<RealMaterialVector[]> {
     console.log(`📊 NORMALIZACION: primeros IDs: ${ids.slice(0, 12).join(', ') || 'NINGUNO'}`);
     return vectors;
   } catch (error: any) {
-    console.error('❌ Error leyendo NORMALIZACION:', error?.message || error);
+    console.warn('⚠️ Error leyendo NORMALIZACION:', error?.message || error);
+    const fallback = await readRealVectorsFromSupabase();
+    if (fallback.length) {
+      cache = fallback;
+      cacheTime = now;
+      return fallback;
+    }
     return [];
   }
 }
