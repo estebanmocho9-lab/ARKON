@@ -7,9 +7,7 @@ import { evaluate } from 'mathjs';
 
 /** Convierte variantes comunes de sintaxis a la sintaxis de mathjs. */
 function normalizarSintaxis(expr: string): string {
-  return expr
-    .replace(/\*\*/g, '^')
-    .replace(/\bIF\s*\(/gi, 'if(');
+  return expr.replace(/\*\*/g, '^');
 }
 
 /** Aproximación de erf(x), usada por fórmulas de difusión. */
