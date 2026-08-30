@@ -42,6 +42,38 @@ function parseComposicion(value: unknown): Record<string, number> {
   return {};
 }
 
+/**
+ * Convierte una composición a fracciones físicas 0..1.
+ * Acepta dos formatos explícitos:
+ *   - fracciones: 0.65 + 0.22 + 0.08 + 0.05 = 1
+ *   - porcentajes: 65 + 22 + 8 + 5 = 100
+ * Cualquier otra suma se rechaza para no fabricar una dosificación.
+ */
+function normalizarComposicion(raw: Record<string, number>): Record<string, number> {
+  const entries = Object.entries(raw).filter(([, v]) => Number.isFinite(v) && v > 0);
+  if (!entries.length) return {};
+  const suma = entries.reduce((s, [, v]) => s + v, 0);
+  const tolerancia = 1e-6;
+  if (Math.abs(suma - 1) <= tolerancia) {
+    return Object.fromEntries(entries.map(([id, v]) => [id, v]));
+  }
+  if (Math.abs(suma - 100) <= 1e-4) {
+    return Object.fromEntries(entries.map(([id, v]) => [id, v / 100]));
+  }
+  throw new Error(`Composición inválida: la suma de fracciones/porcentajes es ${suma}. Debe ser 1 o 100.`);
+}
+
+function parseListaJson(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch { return []; }
+  }
+  return [];
+}
+
 const MAYOR_ES_PEOR = new Set([
   'absorcion_agua', 'porosidad_total', 'indice_vacios_e', 'indice_vacios',
   'permeabilidad_intrinseca', 'conductividad_hidraulica', 'difusion_agua',
@@ -85,28 +117,19 @@ function nivelFalla(propiedad: string, valor: number): 'critica' | 'alta' | 'mod
 
 function descripcionPropiedad(prop: string, valor: number): string {
   const nombres: Record<string, string> = {
-    absorcion_agua: 'absorción de agua',
-    porosidad_total: 'porosidad total',
-    indice_vacios_e: 'índice de vacíos',
-    permeabilidad_intrinseca: 'permeabilidad intrínseca',
-    conductividad_hidraulica: 'conductividad hidráulica',
-    difusion_agua: 'difusión de agua',
-    resistencia_compresion: 'resistencia a compresión',
-    resistencia_traccion: 'resistencia a tracción',
-    resistencia_flexion: 'resistencia a flexión',
-    modulo_young: 'módulo de Young',
-    cohesion: 'cohesión',
-    dureza_mohs: 'dureza Mohs',
-    conductividad_termica: 'conductividad térmica',
-    temperatura_servicio: 'temperatura de servicio',
-    huella_carbono: 'huella de carbono',
-    energia_incorporada: 'energía incorporada',
-    reciclabilidad: 'reciclabilidad',
+    absorcion_agua: 'absorción de agua', porosidad_total: 'porosidad total',
+    indice_vacios_e: 'índice de vacíos', permeabilidad_intrinseca: 'permeabilidad intrínseca',
+    conductividad_hidraulica: 'conductividad hidráulica', difusion_agua: 'difusión de agua',
+    resistencia_compresion: 'resistencia a compresión', resistencia_traccion: 'resistencia a tracción',
+    resistencia_flexion: 'resistencia a flexión', modulo_young: 'módulo de Young',
+    cohesion: 'cohesión', dureza_mohs: 'dureza Mohs', conductividad_termica: 'conductividad térmica',
+    temperatura_servicio: 'temperatura de servicio', huella_carbono: 'huella de carbono',
+    energia_incorporada: 'energía incorporada', reciclabilidad: 'reciclabilidad',
     impermeabilidad: 'impermeabilidad',
   };
   const nombre = nombres[prop] ?? prop.replaceAll('_', ' ');
-  if (MAYOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel elevado según el umbral operativo del motor.`;
-  if (MENOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel insuficiente según el umbral operativo del motor.`;
+  if (MAYOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel elevado según el umbral operativo actual.`;
+  if (MENOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel insuficiente según el umbral operativo actual.`;
   return `${nombre}: índice ${valor.toFixed(1)}/100 — requiere revisión.`;
 }
 
@@ -144,12 +167,13 @@ async function buscarMejoras(
     .limit(100);
 
   for (const mejora of mejoras ?? []) {
-    const texto = [mejora.problema, mejora.causa, mejora.contexto, mejora.material_sugerido]
+    const texto = [mejora.problema, mejora.causa, mejora.material_sugerido]
       .filter(Boolean).join(' ').toLowerCase();
-    const coincideContexto = !mejora.contexto || texto.includes(String(contexto).toLowerCase());
+    const contextoRegla = mejora.contexto == null ? null : String(mejora.contexto).trim().toLowerCase();
+    const coincideContexto = !contextoRegla || contextoRegla === String(contexto).trim().toLowerCase();
     const coincideProp = propiedadesProblema.some(p => texto.includes(p.toLowerCase()));
     const coincideMaterial = materialIds.some(id => texto.includes(id.toLowerCase()));
-    if ((coincideProp || coincideMaterial || coincideContexto) && mejora.solucion) {
+    if (coincideContexto && (coincideProp || coincideMaterial) && mejora.solucion) {
       const linea = mejora.material_sugerido
         ? `${mejora.solucion} (material sugerido: ${mejora.material_sugerido})`
         : String(mejora.solucion);
@@ -177,10 +201,10 @@ async function buscarMezclas(
   for (const regla of reglas ?? []) {
     if (!propiedadesProblema.includes(String(regla.propiedad_nombre))) continue;
     const partes = Object.entries(composicion)
-      .map(([id, fraccion]) => `${id} ${(Number(fraccion) * 100).toFixed(1)}%`)
+      .map(([id, fraccion]) => `${id} ${(Number(fraccion) * 100).toFixed(3)}%`)
       .join(', ');
     recomendaciones.push(
-      `Regla de mezcla para ${regla.propiedad_nombre}: ${regla.descripcion ?? regla.formula ?? 'sin descripción'} | composición evaluada: ${partes}`
+      `Regla disponible para ${regla.propiedad_nombre}: ${regla.descripcion ?? regla.formula ?? 'sin descripción'} | composición evaluada: ${partes}`
     );
   }
   return recomendaciones;
@@ -198,11 +222,11 @@ async function buscarTriz(
     .limit(200);
 
   for (const fila of data ?? []) {
-    const mejora = Array.isArray(fila.propiedades_mejora) ? fila.propiedades_mejora : [];
-    const empeora = Array.isArray(fila.propiedades_empeora) ? fila.propiedades_empeora : [];
+    const mejora = parseListaJson(fila.propiedades_mejora);
+    const empeora = parseListaJson(fila.propiedades_empeora);
     const texto = [...mejora, ...empeora].map(String).join(' ').toLowerCase();
     if (!propiedadesProblema.some(p => texto.includes(p.toLowerCase()))) continue;
-    const principios = Array.isArray(fila.nombres_principios) ? fila.nombres_principios : [];
+    const principios = parseListaJson(fila.nombres_principios);
     for (const principio of principios.slice(0, 3)) {
       if (!salida.includes(String(principio))) salida.push(String(principio));
     }
@@ -230,23 +254,38 @@ export default async function handler(req: any, res: any) {
         return;
       }
       producto = data;
+    } else if (body.product_id || body.productId) {
+      const productId = Number(body.product_id ?? body.productId);
+      if (!Number.isInteger(productId)) {
+        res.status(400).json({ error: 'productId debe ser un entero de public.productos.' });
+        return;
+      }
+      const { data, error } = await supabase
+        .from('productos').select('*').eq('id', productId).eq('activo', true).maybeSingle();
+      if (error || !data) {
+        res.status(404).json({ error: `No se encontró el producto ${productId} en Supabase.` });
+        return;
+      }
+      producto = data;
     } else if (body.material_id) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('productos').select('*').eq('material_id', body.material_id).eq('activo', true).limit(1).maybeSingle();
+      if (error) throw error;
       producto = data;
     }
 
     if (!producto) {
-      res.status(404).json({ error: 'No se encontró el producto real en Supabase para ese material_id.' });
+      res.status(404).json({ error: 'No se encontró el producto real en Supabase para la selección recibida.' });
       return;
     }
 
     const productoId = producto.id;
     const nombreProducto = producto.nombre ?? body.producto;
     const contexto = producto.contexto ?? body.contexto ?? 'general';
+    const estado = typeof producto.estado === 'string' ? producto.estado : (typeof body.estado === 'string' ? body.estado : undefined);
     const composicionOriginal = parseComposicion(producto.composicion);
     const composicion = Object.keys(composicionOriginal).length
-      ? composicionOriginal
+      ? normalizarComposicion(composicionOriginal)
       : { [producto.material_id ?? body.material_id]: 1 };
 
     const componentes: Componente[] = [];
@@ -254,39 +293,37 @@ export default async function handler(req: any, res: any) {
     const pendientes: string[] = [];
 
     console.log(`🔬 ARKON ANALIZAR → ${nombreProducto}`);
-    console.log(`📦 Composición: ${JSON.stringify(composicion)}`);
+    console.log(`📦 Composición normalizada: ${JSON.stringify(composicion)}`);
+    console.log(`🧪 Estado: ${estado ?? 'E01 por defecto'}`);
 
-    for (const [id, porcentajeRaw] of Object.entries(composicion)) {
-      const porcentaje = Number(porcentajeRaw);
-      if (!Number.isFinite(porcentaje) || porcentaje <= 0) continue;
+    for (const [id, fraccion] of Object.entries(composicion)) {
+      if (!Number.isFinite(fraccion) || fraccion <= 0) continue;
       const materialId = resolverMaterialId(id);
-
-      const resultado = await activarNeuronas(materialId, contexto);
+      const resultado = await activarNeuronas(materialId, contexto, estado);
       if (resultado.neuronasActivadas.length === 0) {
-        pendientes.push(`${materialId}: sin neuronas con datos reales`);
+        pendientes.push(`${materialId}: sin neuronas con datos reales para el estado/contexto solicitado`);
       }
 
       componentes.push({
         id,
-        fraccion: porcentaje,
-        porcentaje: porcentaje * 100,
+        fraccion,
+        porcentaje: fraccion * 100,
         materialId,
         datos: resultado.neuronasActivadas.length > 0
           ? `${resultado.neuronasActivadas.length} neuronas / ${resultado.coberturaPorc.toFixed(1)}% cobertura`
           : 'sin datos',
       });
 
-      activacionesPorMaterial.push({
-        materialId,
-        porcentaje,
-        resultado,
-      });
+      activacionesPorMaterial.push({ materialId, porcentaje: fraccion, resultado });
+    }
+
+    if (!activacionesPorMaterial.length) {
+      throw new Error('La composición no contiene componentes válidos. No se ejecuta un análisis parcial con pesos inventados.');
     }
 
     const porPropiedad = new Map<string, { suma: number; peso: number; neuronas: AnyRow[] }>();
     for (const item of activacionesPorMaterial) {
-      const r = item.resultado;
-      for (const neurona of r.neuronasActivadas) {
+      for (const neurona of item.resultado.neuronasActivadas) {
         const actual = porPropiedad.get(neurona.propertyName) ?? { suma: 0, peso: 0, neuronas: [] };
         const peso = Number(item.porcentaje);
         actual.suma += Number(neurona.valorCompuesto) * peso;
@@ -317,9 +354,7 @@ export default async function handler(req: any, res: any) {
         })),
       });
 
-      for (const n of info.neuronas) {
-        if (Array.isArray(n.anomalias)) anomalías.push(...n.anomalias);
-      }
+      for (const n of info.neuronas) if (Array.isArray(n.anomalias)) anomalías.push(...n.anomalias);
 
       if (nivel) {
         fallas.push({
@@ -336,38 +371,33 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    fallas.sort((a, b) => Number(b.valor) - Number(a.valor));
+    // Prioridad correcta: la severidad no depende de que el número sea alto.
+    const severidad = { critica: 3, alta: 2, moderada: 1 } as const;
+    fallas.sort((a, b) => (severidad[b.nivel as keyof typeof severidad] ?? 0) - (severidad[a.nivel as keyof typeof severidad] ?? 0));
+
     const propiedadesProblema = [...new Set(fallas.map(f => String(f.propiedad)))];
     const materialIds = componentes.map(c => c.materialId);
-
-    const { soluciones, fuentes: fuentesMejora } = await buscarMejoras(
-      supabase,
-      contexto,
-      propiedadesProblema,
-      materialIds
-    );
+    const { soluciones, fuentes: fuentesMejora } = await buscarMejoras(supabase, contexto, propiedadesProblema, materialIds);
     const mezclas = await buscarMezclas(supabase, propiedadesProblema, composicion);
     const triz = await buscarTriz(supabase, propiedadesProblema);
 
+    // Cobertura física: promedio ponderado por las fracciones reales (0..1).
     const cobertura = propiedades.length > 0
-      ? activacionesPorMaterial.reduce((s, x) => s + Number(x.resultado.coberturaPorc ?? 0) * Number(x.porcentaje), 0) / 100
-      : 0;
-    const indice = propiedades.length
-      ? propiedades.reduce((s, p) => s + Number(p.valor), 0) / propiedades.length
+      ? activacionesPorMaterial.reduce((s, x) => s + Number(x.resultado.coberturaPorc ?? 0) * Number(x.porcentaje), 0)
       : 0;
 
+    // No se mezclan propiedades dimensionalmente distintas para fabricar un "índice" científico.
+    // El campo histórico coherencia_global recibe cobertura, no una media sin dimensión.
     const causas = fallas.map(f => f.descripcion);
     if (anomalías.length) causas.push(...[...new Set(anomalías)].slice(0, 10).map(String));
     if (pendientes.length) causas.push(`Datos faltantes: ${pendientes.join(' | ')}`);
-    if (!causas.length) causas.push('No se detectaron fallas según los umbrales operativos disponibles y los datos reales cargados.');
+    if (!causas.length) causas.push('No se detectaron alertas con los umbrales operativos actuales; esto no equivale a ausencia de falla científica.');
 
     const solucionesFinales = [...soluciones];
-    solucionesFinales.push(...mezclas);
-    if (!solucionesFinales.length && !fuentesMejora.length) {
-      solucionesFinales.push('No hay reglas de mejora/mezcla cargadas en Supabase para las fallas detectadas. No se inventa una recomendación.');
+    if (!solucionesFinales.length && fuentesMejora.length === 0) {
+      solucionesFinales.push('No hay una solución material/formulación validada disponible en la base de conocimiento para las alertas detectadas. ARKON no inventa una solución.');
     }
 
-    // Persistir activaciones reales de las neuronas del producto.
     const filasNeuronas = propiedades.flatMap(p => {
       const info = porPropiedad.get(p.propiedad);
       return (info?.neuronas ?? []).map((n: AnyRow) => ({
@@ -381,7 +411,7 @@ export default async function handler(req: any, res: any) {
 
     const problemaDetectado = fallas.length
       ? `Se detectaron ${fallas.length} propiedades con alerta en ${nombreProducto} (${contexto}).`
-      : `Análisis completo ejecutado para ${nombreProducto} (${contexto}).`;
+      : `Análisis ejecutado para ${nombreProducto} (${contexto}).`;
 
     const { data: resultadoGuardado, error: errorResultado } = await supabase
       .from('resultados')
@@ -393,39 +423,26 @@ export default async function handler(req: any, res: any) {
         compatibilidades: [],
         mejoras: triz.slice(0, 10),
         confianza_general: Math.round(Math.min(1, cobertura / 100) * 1000) / 1000,
-        neuronas_activadas: propiedades.reduce((s, p) => s + Number(p.componentes?.length ?? 0), 0),
+        neuronas_activadas: filasNeuronas.length,
         inferencias_generadas: fallas.length,
-        coherencia_global: Math.round(Math.min(100, indice) * 100) / 100,
+        coherencia_global: Math.round(Math.min(100, cobertura) * 100) / 100,
         propiedades_pendientes: pendientes,
         fecha: new Date().toISOString(),
       })
       .select('id')
       .single();
 
-    if (errorResultado || !resultadoGuardado) {
-      throw new Error(`Error guardando resultado: ${errorResultado?.message ?? 'resultado no creado'}`);
-    }
+    if (errorResultado || !resultadoGuardado) throw new Error(`Error guardando resultado: ${errorResultado?.message ?? 'resultado no creado'}`);
 
     if (trabajoId) {
-      await supabase.from('trabajos').update({
-        estado: 'completado',
-        resultado_id: resultadoGuardado.id,
-        actualizado_en: new Date().toISOString(),
-      }).eq('id', trabajoId);
+      await supabase.from('trabajos').update({ estado: 'completado', resultado_id: resultadoGuardado.id, actualizado_en: new Date().toISOString() }).eq('id', trabajoId);
     }
 
     res.status(200).json({
       ok: true,
       resultado_id: resultadoGuardado.id,
-      producto: {
-        id: productoId,
-        nombre: nombreProducto,
-        contexto,
-        composicion,
-        componentes,
-      },
+      producto: { id: productoId, nombre: nombreProducto, contexto, estado: estado ?? null, composicion, componentes },
       resumen: {
-        indice: Math.round(indice * 10) / 10,
         cobertura: Math.round(cobertura * 10) / 10,
         fallas_detectadas: fallas.length,
         propiedades_evaluadas: propiedades.length,
@@ -438,6 +455,11 @@ export default async function handler(req: any, res: any) {
       triz,
       pendientes,
       reglas_mejora_encontradas: fuentesMejora.length,
+      advertencias: [
+        'Los valores entregados por NORMALIZACION son índices operativos 0..100; no se presentan como magnitudes físicas con unidades.',
+        'Los umbrales de falla actuales siguen siendo operativos. La siguiente etapa debe sustituirlos por límites científicos por propiedad, material, estado y condición de ensayo.',
+        'Las reglas de mezcla listadas aquí son conocimiento disponible; todavía no constituyen una formulación nueva calculada y validada.',
+      ],
     });
   } catch (err: any) {
     console.error('❌ /api/analizar:', err);
