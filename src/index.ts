@@ -1,15 +1,15 @@
 // ============================================================
 // src/index.ts
 // IMPULSO IA — PUNTO DE ENTRADA PRINCIPAL
-// Lee productos y contextos desde Supabase (tabla 'productos').
-// No hay listas hardcodeadas. Cualquier material/contexto nuevo
-// se agrega en Supabase y el sistema lo procesa automáticamente.
+// Los vectores operativos provienen DIRECTAMENTE de NORMALIZACION.
+// Los productos pueden vivir en Supabase, pero su material_id debe
+// coincidir con los IDs reales de NORMALIZACION (por ejemplo M.001).
 // ============================================================
 
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { syncMaterialesToSupabase, listarMaterialesSupabase } from './sheets/syncData';
+import { listarMaterialesDesdeSheet } from './sheets/syncData';
 import { activarNeuronas } from './core/activationEngine';
 import { supabase } from './supabase/client';
 
@@ -45,11 +45,7 @@ function describir(prop: string, valor: number, nivel: 'alto' | 'bajo'): string 
 }
 
 // ── Análisis de un producto ────────────────────────────────────
-async function generarResultadoReal(
-  materialId: string,
-  producto: string,
-  contexto: string
-): Promise<void> {
+async function generarResultadoReal(materialId: string, producto: string, contexto: string): Promise<void> {
   console.log(`\n🔬 Analizando: ${producto} (${materialId})`);
 
   const resultado = await activarNeuronas(materialId, contexto);
@@ -65,12 +61,8 @@ async function generarResultadoReal(
         `Propiedades sin datos: ${resultado.propiedadesPendientes.slice(0, 3).join(', ')}`,
       ],
       soluciones_propuestas: ['Completá los valores en NORMALIZACION y volvé a correr el sistema'],
-      compatibilidades: [],
-      mejoras: [],
-      confianza_general: 0,
-      neuronas_activadas: 0,
-      inferencias_generadas: 0,
-      coherencia_global: 0,
+      compatibilidades: [], mejoras: [], confianza_general: 0,
+      neuronas_activadas: 0, inferencias_generadas: 0, coherencia_global: 0,
       propiedades_pendientes: resultado.propiedadesPendientes,
       fecha: new Date().toISOString(),
     }, { onConflict: 'producto' });
@@ -79,15 +71,12 @@ async function generarResultadoReal(
 
   const activaciones = resultado.neuronasActivadas;
   const confianzaPromedio = activaciones.reduce((sum, n) => sum + (n.confianza ?? 0), 0) / activaciones.length;
-
   const causas: string[] = [];
   const soluciones: string[] = [];
 
   for (const neurona of activaciones) {
     const valor = neurona.valorCompuesto;
-    const anomalias = neurona.anomalias;
     const prop = neurona.propertyName;
-
     if (valor > 60) {
       const d = describir(prop, valor, 'alto');
       if (d) causas.push(d);
@@ -96,113 +85,62 @@ async function generarResultadoReal(
       const d = describir(prop, valor, 'bajo');
       if (d) soluciones.push(d);
     }
-    if (anomalias && anomalias.length > 0) {
-      causas.push(...anomalias.slice(0, 1));
-    }
-
-    // Mostrar índices intermedios calculados por scientific_formulas
-    if (neurona.indicesIntermedios && Object.keys(neurona.indicesIntermedios).length > 0) {
-      console.log(`   📐 ${prop} → índices: ${JSON.stringify(neurona.indicesIntermedios)}`);
-    }
+    if (neurona.anomalias?.length) causas.push(...neurona.anomalias.slice(0, 1));
   }
 
-  const coberturaPorc = resultado.coberturaPorc ??
-    (resultado.propiedadesConDatos / Math.max(resultado.totalNeuronas, 1) * 100);
-
-  // Problema principal — leído de Supabase si existe, sino descripción genérica
+  const coberturaPorc = resultado.coberturaPorc ?? (resultado.propiedadesConDatos / Math.max(resultado.totalNeuronas, 1) * 100);
   const { data: problemaDB } = await supabase
-    .from('problemas')
-    .select('descripcion')
-    .eq('nombre_problema', contexto)
-    .maybeSingle();
-
+    .from('problemas').select('descripcion').eq('nombre_problema', contexto).maybeSingle();
   const problemaPrincipal = problemaDB?.descripcion ?? `Análisis de ${contexto} completado`;
 
-  const causasFinales = causas.slice(0, 4).length > 0
-    ? causas.slice(0, 4)
-    : [`Análisis con ${activaciones.length} neuronas (${coberturaPorc.toFixed(0)}% cobertura)`];
-
-  const solucionesFinales = soluciones.slice(0, 4).length > 0
-    ? soluciones.slice(0, 4)
-    : ['Completá las propiedades faltantes en NORMALIZACION para mayor precisión'];
-
+  const causasFinales = causas.slice(0, 4).length > 0 ? causas.slice(0, 4) :
+    [`Análisis con ${activaciones.length} neuronas (${coberturaPorc.toFixed(0)}% cobertura)`];
+  const solucionesFinales = soluciones.slice(0, 4).length > 0 ? soluciones.slice(0, 4) :
+    ['Completá las propiedades faltantes en NORMALIZACION para mayor precisión'];
   if (resultado.propiedadesPendientes.length > 0) {
-    causasFinales.push(
-      `Sin datos (ignoradas): ${resultado.propiedadesPendientes.slice(0, 3).join(', ')}`
-    );
+    causasFinales.push(`Sin datos (ignoradas): ${resultado.propiedadesPendientes.slice(0, 3).join(', ')}`);
   }
 
   const { error } = await supabase.from('resultados').upsert({
-    producto,
-    problema_detectado: problemaPrincipal,
-    causas_fisicas: causasFinales,
-    soluciones_propuestas: solucionesFinales,
-    compatibilidades: [],
-    mejoras: [],
+    producto, problema_detectado: problemaPrincipal, causas_fisicas: causasFinales,
+    soluciones_propuestas: solucionesFinales, compatibilidades: [], mejoras: [],
     confianza_general: Math.round(confianzaPromedio * 100) / 100,
-    neuronas_activadas: activaciones.length,
-    inferencias_generadas: activaciones.length,
+    neuronas_activadas: activaciones.length, inferencias_generadas: activaciones.length,
     coherencia_global: Math.round(coberturaPorc) / 100,
     propiedades_pendientes: resultado.propiedadesPendientes,
     fecha: new Date().toISOString(),
   }, { onConflict: 'producto' });
 
-  if (error) {
-    console.error(`❌ Error guardando resultado:`, error.message);
-  } else {
-    console.log(`✅ Resultado guardado — ${producto}`);
-    console.log(`   Confianza: ${(confianzaPromedio * 100).toFixed(1)}%`);
-    console.log(`   Neuronas activadas: ${activaciones.length}/${resultado.totalNeuronas}`);
-    console.log(`   Cobertura: ${coberturaPorc.toFixed(0)}%`);
-    if (resultado.propiedadesPendientes.length > 0) {
-      console.log(`   Sin datos (ignoradas): ${resultado.propiedadesPendientes.join(', ')}`);
-    }
-  }
+  if (error) console.error('❌ Error guardando resultado:', error.message);
+  else console.log(`✅ Resultado guardado — ${producto} — ${coberturaPorc.toFixed(0)}% cobertura`);
 }
 
-// ── MAIN ───────────────────────────────────────────────────────
 async function main() {
   console.log('\n═══════════════════════════════════════');
   console.log('🧠 IMPULSO IA — Sistema Neuronal Físico');
   console.log('═══════════════════════════════════════\n');
 
-  // PASO 1 — Sincronizar Google Sheets → Supabase
-  await syncMaterialesToSupabase();
-
-  // PASO 2 — Verificar materiales disponibles
-  const materiales = await listarMaterialesSupabase();
-  console.log(`\n📦 Materiales en Supabase: ${materiales.length > 0 ? materiales.join(', ') : 'ninguno'}`);
+  // NORMALIZACION es la fuente única de vectores. No sincronizamos ni
+  // inventamos una tabla intermedia de materiales.
+  const materiales = await listarMaterialesDesdeSheet();
+  console.log(`\n📦 Materiales reales en NORMALIZACION: ${materiales.length > 0 ? materiales.join(', ') : 'ninguno'}`);
 
   if (materiales.length === 0) {
-    console.log('\n⚠️  No hay materiales en Supabase.');
-    console.log('   Asegurate que NORMALIZACION tenga datos y volvé a correr.');
+    console.log('\n⚠️ No hay materiales en NORMALIZACION.');
     return;
   }
 
-  // PASO 3 — Leer productos desde Supabase
-  // Para agregar un nuevo producto/material/contexto:
-  // INSERT INTO productos (nombre, material_id, contexto, activo)
-  // VALUES ('Nombre del producto', 'MA.XXX', 'contexto', true)
-  console.log('\n🔬 Iniciando análisis de productos...\n');
-
   const { data: productos, error: errorProductos } = await supabase
-    .from('productos')
-    .select('nombre, material_id, contexto')
-    .eq('activo', true)
-    .order('id', { ascending: true });
+    .from('productos').select('nombre, material_id, contexto').eq('activo', true).order('id', { ascending: true });
 
   if (errorProductos || !productos || productos.length === 0) {
-    console.log('⚠️  No hay productos activos en la tabla "productos" de Supabase.');
-    console.log('   Agregá filas con: nombre, material_id, contexto, activo=true');
-    console.log('   Contextos disponibles:');
-    console.log('   humedad | fragilidad | termico | aislamiento_termico |');
-    console.log('   quimico | estructural | sustentabilidad | peso | general');
+    console.log('⚠️ No hay productos activos en Supabase.');
     return;
   }
 
   for (const p of productos) {
-    if (!materiales.includes(p.material_id)) {
-      console.log(`⏭️  ${p.nombre} — ${p.material_id} no disponible en NORMALIZACION`);
+    if (!materiales.includes(String(p.material_id).trim())) {
+      console.log(`⏭️ ${p.nombre} — ${p.material_id} no existe en NORMALIZACION; no se analiza.`);
       continue;
     }
     await generarResultadoReal(p.material_id, p.nombre, p.contexto);
