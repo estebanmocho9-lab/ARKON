@@ -109,10 +109,11 @@ app.get('/api/products/:id', async (req, res) => {
  */
 app.post('/api/analizar', async (req, res) => {
   try {
-    const requestedId = typeof req.body?.productId === 'string' ? req.body.productId :
-      (typeof req.body?.material_id === 'string' ? req.body.material_id :
-        (typeof req.body?.materialId === 'string' ? req.body.materialId : ''));
-    if (!requestedId.trim()) return res.status(400).json({ ok: false, error: 'productId, material_id o materialId es obligatorio.' });
+    // Aceptar tanto IDs JSON numéricos como strings y también material_id/materialId.
+    // Impulso Vector envía productId como número en su petición real.
+    const rawId = req.body?.productId ?? req.body?.material_id ?? req.body?.materialId;
+    const requestedId = rawId === undefined || rawId === null ? '' : String(rawId).trim();
+    if (!requestedId) return res.status(400).json({ ok: false, error: 'productId, material_id o materialId es obligatorio.' });
 
     const product = await resolverProducto(requestedId);
     if (!product) return res.status(404).json({ ok: false, error: 'Producto/material no encontrado en Supabase.' });
@@ -128,10 +129,8 @@ app.post('/api/analizar', async (req, res) => {
     const contexto = typeof req.body?.contexto === 'string' && req.body.contexto.trim() ? req.body.contexto.trim().toLowerCase() : 'general';
     const estado = typeof req.body?.estado === 'string' ? req.body.estado : undefined;
 
-    // 1) Activación global: exactamente el tipo de recorrido que usa el diagnóstico integral.
     const activacion = await activarNeuronas(materialId, 'general', estado);
 
-    // 2) Problemas detectados por umbral operativo, sin inventar valores.
     const problemasDetectados = activacion.neuronasActivadas
       .map(n => ({
         neuronId: n.neuronId,
@@ -147,7 +146,6 @@ app.post('/api/analizar', async (req, res) => {
     const propsProblema = problemasDetectados.map(p => p.propertyName);
     const disponibles = new Set(activacion.neuronasActivadas.map(n => n.propertyName));
 
-    // 3) Ejecutar TODOS los problemas científicos configurados en Supabase.
     const { data: problemasConfig, error: problemasError } = await supabase
       .from('problemas').select('*').order('nombre_problema', { ascending: true });
     if (problemasError) console.warn('⚠️ No se pudieron cargar problemas:', problemasError.message);
@@ -169,7 +167,6 @@ app.post('/api/analizar', async (req, res) => {
       }
     }
 
-    // 4) Mejoras reales registradas en Supabase, vinculadas a los problemas detectados.
     const { data: reglas, error: reglasError } = await supabase
       .from('reglas_mejora')
       .select('neurona_id,condicion,solucion,prioridad')
@@ -191,7 +188,6 @@ app.post('/api/analizar', async (req, res) => {
       return propsProblema.some(p => texto.includes(p.toLowerCase())) || texto.includes('yeso');
     }).slice(0, 12);
 
-    // 5) Todas las fórmulas científicas relacionadas con propiedades problemáticas.
     const { data: formulas, error: formulasError } = await supabase
       .from('scientific_formulas').select('id,nombre,descripcion,propiedad_a,propiedad_b,tipo_relacion,ecuacion,forma_computable,variables_input,output_nombre,output_unidad,dominio_fisico,rango_valido,peso_cientifico,confianza,fuente').limit(500);
     if (formulasError) console.warn('⚠️ No se pudieron cargar scientific_formulas:', formulasError.message);
@@ -202,7 +198,6 @@ app.post('/api/analizar', async (req, res) => {
       return propsProblema.some(p => pa.includes(p.toLowerCase()) || pb.includes(p.toLowerCase()));
     }).slice(0, 50);
 
-    // 6) Cruces científicos: cobertura real con las propiedades que sí están activadas.
     const { data: cruces, error: crucesError } = await supabase
       .from('cruces_cientificos').select('nombre_cruce,propiedades_requeridas,formula,descripcion,problema,activo').eq('activo', true).limit(300);
     if (crucesError) console.warn('⚠️ No se pudieron cargar cruces_cientificos:', crucesError.message);
@@ -214,7 +209,6 @@ app.post('/api/analizar', async (req, res) => {
       return { ...c, presentes, faltantes, coberturaPorc: requeridas.length ? presentes.length / requeridas.length * 100 : 0, evaluable: requeridas.length > 0 && faltantes.length === 0 };
     }).filter((c: any) => c.presentes.length > 0).sort((a: any, b: any) => b.coberturaPorc - a.coberturaPorc).slice(0, 100);
 
-    // 7) TRIZ real vinculado a las propiedades detectadas.
     const { data: triz, error: trizError } = await supabase
       .from('triz_contradicciones').select('param_triz_mejora,param_triz_empeora,propiedades_mejora,propiedades_empeora,nombres_principios').eq('activo', true).limit(500);
     if (trizError) console.warn('⚠️ No se pudieron cargar triz_contradicciones:', trizError.message);
