@@ -7,7 +7,7 @@ import { supabase } from '../../supabase/client';
 import { evaluarExpresion, sumaPonderada } from '../../utils/mathHelpers';
 import { ComponenteBase, NeuronInput, NeuronOutput, EstadoMaterial } from './tipos';
 export type { NeuronInput, NeuronOutput, EstadoMaterial, ComponenteBase };
-import { getValorNormalizado } from '../../sheets/readVectors';
+import { getValorNormalizado, readVectorsFromSheet } from '../../sheets/readVectors';
 
 const _neuronasEnProceso = new Set<string>();
 
@@ -45,7 +45,7 @@ export abstract class NeuronBase {
         componentesUsados = result.componentesConDato;
         anomalias.push(...result.anomalias);
       } else {
-        const valorSheet = await getValorNormalizado(input.materialId, this.propertyName);
+        const valorSheet = await getValorNormalizado(input.materialId, this.propertyName, input.estado);
         if (valorSheet !== null && !isNaN(valorSheet)) {
           valorCompuesto = Math.min(100, Math.max(0, valorSheet));
           componentesUsados = 1;
@@ -105,7 +105,7 @@ export abstract class NeuronBase {
     const anomalias: string[] = [];
 
     for (const comp of componentes) {
-      const valor = await getValorNormalizado(comp.materialId, this.propertyName);
+      const valor = await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
       if (valor === null || isNaN(valor)) {
         anomalias.push(`sin_dato_en_sheet:${comp.materialId}/${this.propertyName}`);
         continue;
@@ -229,6 +229,20 @@ export abstract class NeuronBase {
     } catch { return { tipo: null, familia: null }; }
   }
 
+  /** Extrae símbolos que pueden representar variables de una fórmula. */
+  private extraerSimbolos(expr: string): string[] {
+    const funciones = new Set([
+      'LEAST', 'GREATEST', 'least', 'greatest', 'erf_approx',
+      'abs', 'acos', 'acosh', 'acot', 'acoth', 'acsc', 'acsch', 'asec', 'asech',
+      'asin', 'asinh', 'atan', 'atan2', 'atanh', 'ceil', 'cos', 'cosh', 'cot',
+      'coth', 'csc', 'csch', 'exp', 'floor', 'log', 'log10', 'max', 'min',
+      'mod', 'nthRoot', 'round', 'sec', 'sech', 'sin', 'sinh', 'sqrt', 'tan',
+      'tanh', 'sign', 'pi', 'e', 'true', 'false'
+    ]);
+    return Array.from(new Set(expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []))
+      .filter(nombre => !funciones.has(nombre));
+  }
+
   protected async calcularIndicesIntermedios(input: NeuronInput, valorPropio: number): Promise<Record<string, number>> {
     const indices: Record<string, number> = {};
     let NEURON_MAP: Record<string, NeuronBase>;
@@ -240,44 +254,67 @@ export abstract class NeuronBase {
     const formulas = await this.consultarFormulas();
     if (formulas.length === 0) return indices;
 
+    // Cargar una sola vez el vector REAL del material. Las fórmulas científicas
+    // pueden necesitar varias propiedades a la vez; no debemos asumir que
+    // propiedad_a/propriedad_b son las únicas variables disponibles.
+    const vectors = await readVectorsFromSheet();
+    const materialVector = vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
+      ?? vectors.find(v => v.materialId === input.materialId);
+    const scopeBase: Record<string, number> = {};
+
+    // El contexto puede aportar variables experimentales (temperatura, carga,
+    // geometría, etc.). Los datos reales de NORMALIZACION tienen prioridad para
+    // propiedades del material y la propiedad que está procesando la neurona
+    // siempre se fuerza a su valor real actual.
+    for (const [key, value] of Object.entries((input.contexto as any) ?? {})) {
+      const n = Number(value);
+      if (Number.isFinite(n)) scopeBase[key] = n;
+    }
+    if (materialVector) {
+      for (const [key, value] of Object.entries(materialVector.propiedades)) {
+        if (value !== null && Number.isFinite(Number(value))) scopeBase[key] = Number(value);
+      }
+    }
+    scopeBase[this.propertyName] = valorPropio;
+
     for (const formula of formulas) {
       try {
         const fc = formula.forma_computable?.trim();
         if (!fc || formula.propiedad_a === 'ninguna') continue;
         if (fc.includes('for ') || fc.includes('sum(') || fc.startsWith('#')) continue;
 
-        const scope: Record<string, number> = { [this.propertyName]: valorPropio };
-        const otraPropiedad = formula.propiedad_a === this.propertyName ? formula.propiedad_b : formula.propiedad_a;
-
-        if (otraPropiedad && otraPropiedad !== 'ninguna') {
-          // PRIORIDAD 1: el activationEngine ya leyó el vector real y lo pasó
-          // en contexto. Esto evita que una neurona relacionada reutilice por
-          // error el valorDirecto de la neurona actual.
-          const valorCtx = (input.contexto as any)?.[otraPropiedad];
-          if (valorCtx !== undefined && valorCtx !== null && Number.isFinite(Number(valorCtx))) {
-            scope[otraPropiedad] = Number(valorCtx);
-          } else if (_neuronasEnProceso.has(otraPropiedad)) {
-            continue;
-          } else if (NEURON_MAP[otraPropiedad]) {
-            _neuronasEnProceso.add(otraPropiedad);
-            try {
-              // Esta ruta es un fallback para entradas que no traen contexto.
-              // La neurona relacionada vuelve a leer su propio valor desde
-              // NORMALIZACION cuando no recibe valorDirecto.
-              const otraInput: NeuronInput = { ...input, valorDirecto: undefined };
-              const otraOutput = await NEURON_MAP[otraPropiedad].process(otraInput);
-              if (!otraOutput.propiedadPendiente) scope[otraPropiedad] = otraOutput.valorCompuesto;
-            } finally {
-              _neuronasEnProceso.delete(otraPropiedad);
-            }
-          }
-        }
-
         let expresion = fc;
         const eqIndex = fc.indexOf('=');
         if (eqIndex !== -1 && !fc.substring(0, eqIndex).includes('!') && !fc.substring(0, eqIndex).includes('<') && !fc.substring(0, eqIndex).includes('>')) {
           expresion = fc.substring(eqIndex + 1).trim();
         }
+
+        const scope: Record<string, number> = { ...scopeBase };
+        const simbolos = this.extraerSimbolos(expresion);
+        const faltantes = simbolos.filter(nombre => !Number.isFinite(Number(scope[nombre])));
+
+        // Si una variable ausente corresponde a otra neurona, usar su valor
+        // normalizado real como fallback. Esto evita recursiones y evita volver
+        // a pasar el valorDirecto de la neurona actual a otra propiedad.
+        for (const nombre of faltantes) {
+          if (_neuronasEnProceso.has(nombre) || !NEURON_MAP[nombre]) continue;
+          _neuronasEnProceso.add(nombre);
+          try {
+            const otraInput: NeuronInput = { ...input, valorDirecto: undefined };
+            const otraOutput = await NEURON_MAP[nombre].process(otraInput);
+            if (!otraOutput.propiedadPendiente && Number.isFinite(Number(otraOutput.valorCompuesto))) {
+              scope[nombre] = Number(otraOutput.valorCompuesto);
+            }
+          } finally {
+            _neuronasEnProceso.delete(nombre);
+          }
+        }
+
+        // No convertir una fórmula científicamente incompleta en 0. La dejamos
+        // sin evaluar hasta que estén disponibles todos sus datos de entrada.
+        const faltantesDefinitivos = this.extraerSimbolos(expresion)
+          .filter(nombre => !Number.isFinite(Number(scope[nombre])));
+        if (faltantesDefinitivos.length > 0) continue;
 
         const resultado = evaluarExpresion(expresion, scope);
         if (!isNaN(resultado) && isFinite(resultado)) {
@@ -287,7 +324,7 @@ export abstract class NeuronBase {
           indices[clave] = Math.round(resultado * 1000) / 1000;
         }
       } catch {
-        // Una fórmula que requiera variables ausentes no contamina el resultado.
+        // Una fórmula inválida o incompleta no contamina el resultado de la neurona.
       }
     }
     return indices;
