@@ -14,10 +14,10 @@ let SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID || 'mock-sheet-id';
 
 function normalizarPrivateKey(value: string): string {
   let key = value.trim();
-  // Render puede recibir el valor copiado desde una salida JSON con comillas.
-  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
-    key = key.slice(1, -1);
-  }
+  // Render puede recibir el valor copiado desde una salida JSON, por ejemplo:
+  // "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n",
+  // así que toleramos comillas y la coma final del JSON.
+  key = key.replace(/^\s*["']/, '').replace(/["']\s*,?\s*$/, '');
   return key.replace(/\\n/g, '\n');
 }
 
