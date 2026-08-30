@@ -7,12 +7,20 @@ import { evaluate } from 'mathjs';
 
 /**
  * Evalúa una expresión matemática de forma segura.
- * @param expr Expresión en string (ej: "fracciones[0] * valores[0] + fracciones[1] * valores[1]")
- * @param scope Objeto con variables numéricas.
+ * Las fórmulas científicas almacenadas en Supabase pueden usar nombres
+ * SQL habituales (LEAST/GREATEST). Se exponen como funciones explícitas
+ * para evitar que una fórmula válida termine silenciosamente en cero.
  */
 export function evaluarExpresion(expr: string, scope: Record<string, any>): number {
   try {
-    const result = evaluate(expr, scope);
+    const funcionesCompatibles = {
+      LEAST: (...args: number[]) => Math.min(...args),
+      GREATEST: (...args: number[]) => Math.max(...args),
+      least: (...args: number[]) => Math.min(...args),
+      greatest: (...args: number[]) => Math.max(...args),
+    };
+
+    const result = evaluate(expr, { ...funcionesCompatibles, ...scope });
     if (typeof result === 'number') return result;
     return Number(result) || 0;
   } catch (e) {
@@ -21,16 +29,10 @@ export function evaluarExpresion(expr: string, scope: Record<string, any>): numb
   }
 }
 
-/**
- * Suma ponderada por defecto.
- */
 export function sumaPonderada(fracciones: number[], valores: number[]): number {
   return fracciones.reduce((sum, f, i) => sum + f * valores[i], 0);
 }
 
-/**
- * Normaliza un array de fracciones para que sumen 1.
- */
 export function normalizarFracciones(fracciones: number[]): number[] {
   const total = fracciones.reduce((a, b) => a + b, 0);
   if (total === 0) return fracciones.map(() => 0);
