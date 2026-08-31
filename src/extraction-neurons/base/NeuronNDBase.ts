@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from '../drive/driveReader';
-import { extraerPaginas } from '../pdf/pdfParser';
+import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';
 import { extraerNDUniversal } from './extractorNDUniversal';
 import { crearRAMsND, RAMSetND } from '../memoria-nd/ram';
 import { guardarHallazgosND } from '../../turso/guardarHallazgosND';
@@ -85,7 +85,21 @@ export abstract class NeuronNDBase {
       let total = 0;
       for (const { pagina, texto } of paginas) {
         if (!texto || texto.trim().length < 20) continue;
+        const capitulo = detectarCapitulo(texto);
         const hallazgos = extraerNDUniversal(texto, pagina, archivo.nombre, this.neuronId);
+
+        // La evidencia queda enriquecida con identificador Drive y capítulo
+        // cuando el parser puede detectarlo. No altera la clasificación.
+        for (const h of hallazgos) {
+          h.metadatos = {
+            ...(h.metadatos || {}),
+            documentoDriveId: archivo.id,
+            carpetaDrive: this.numeroCarpeta,
+            ...(capitulo ? { capitulo } : {}),
+          };
+          if (capitulo) h.evidencia.seccion = capitulo;
+        }
+
         this.cargarEnRAM(hallazgos);
         await guardarHallazgosND(hallazgos);
         total += hallazgos.length;
