@@ -3,9 +3,8 @@
 // Prueba el motor de extracción actualizado sobre UN SOLO PDF,
 // mostrando por pantalla lo que encuentra. NO guarda nada en
 // Turso ni en Supabase, NO toca ningún checkpoint — es de solo
-// lectura, pensado para verificar que las cosas nuevas (estados,
-// estado natural, componentes por patrón) están funcionando
-// antes de reprocesar carpetas enteras.
+// lectura, pensado para verificar la extracción antes de
+// reprocesar carpetas enteras.
 //
 // Uso:
 //   npx ts-node --transpile-only probarUnPDF.ts 01
@@ -15,6 +14,9 @@
 // El segundo (opcional) es un pedazo del nombre del archivo, para
 // elegir cuál PDF probar; si no lo pasás, usa el primero legible
 // que encuentre.
+//
+// La carpeta 01 se resuelve DENTRO de CARPETA_MADRE_DRIVE_ID.
+// Esa variable ya forma parte de la configuración de ARKON.
 // ============================================================
 
 import {
@@ -32,17 +34,30 @@ const PALABRAS_ESTADOS_NUEVOS = ['absorción', 'absorcion', 'higroscóp', 'higro
 async function main() {
   const numeroCarpeta = process.argv[2] || '01';
   const filtroNombre = process.argv[3]?.toLowerCase();
+  const carpetaMadreId = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
 
-  console.log(`📂 Buscando carpeta ${numeroCarpeta}...`);
-  const carpetaId = await resolverSubcarpetaPorNombre(numeroCarpeta);
+  if (!carpetaMadreId) {
+    throw new Error(
+      'Falta CARPETA_MADRE_DRIVE_ID en el entorno. ' +
+      'No se puede resolver la carpeta de la neurona sin la carpeta madre de Google Drive.'
+    );
+  }
+
+  console.log(`📂 Buscando carpeta ${numeroCarpeta} dentro de la carpeta madre configurada...`);
+  const carpetaId = await resolverSubcarpetaPorNombre(carpetaMadreId, numeroCarpeta);
   const archivos = await listarPDFs(carpetaId);
 
-  const elegido = filtroNombre
-    ? archivos.find((a) => a.nombre.toLowerCase().includes(filtroNombre))
-    : archivos[0];
+  const candidatos = filtroNombre
+    ? archivos.filter((a) => a.nombre.toLowerCase().includes(filtroNombre))
+    : archivos;
+
+  const elegido = candidatos[0];
 
   if (!elegido) {
     console.error('❌ No encontré ningún PDF que coincida.');
+    if (filtroNombre) {
+      console.log(`   Filtro utilizado: "${filtroNombre}"`);
+    }
     return;
   }
 
