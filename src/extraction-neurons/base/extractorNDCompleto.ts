@@ -16,12 +16,11 @@ export function extraerNDCompleto(
   documento: string,
   neuronId: string,
 ): HallazgoND[] {
+  // La capa universal ya extrae todo lo transversal. Sus definiciones
+  // se reemplazan por la capa completa para evitar duplicados.
   const base = extraerNDUniversal(texto, pagina, documento, neuronId)
-    .filter(h => h.campo !== undefined || h.tipo !== 'DEFINICION');
+    .filter(h => h.tipo !== 'DEFINICION');
 
-  // La capa completa vuelve a emitir definiciones con los campos
-  // historicos + complementarios. Eliminamos la emision anterior
-  // para no duplicar cada definicion.
   const definiciones = extraerDefinicionesPropiedadesCompleto(texto).map(h => {
     const ctx = h.contenido.trim();
     const lang = h.idioma;
