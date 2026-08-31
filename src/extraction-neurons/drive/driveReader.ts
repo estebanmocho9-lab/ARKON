@@ -1,9 +1,6 @@
 // ============================================================
 // src/extraction-neurons/drive/driveReader.ts
 // Lector de Google Drive, reutilizable por las 10 neuronas.
-// Reutiliza las MISMAS credenciales que ya usa tu proyecto para
-// Sheets (credentials.json, cuenta de servicio) — no se crea
-// una conexión nueva desde cero, se reaprovecha la existente.
 // ============================================================
 
 import { google } from 'googleapis';
@@ -31,22 +28,24 @@ export interface ArchivoDrive {
   nombre: string;
 }
 
-// ── Extrae el ID de carpeta de una URL de Drive, o lo devuelve
-//    tal cual si ya era un ID ──────────────────────────────────
+// ── Acepta tanto un ID como una URL de carpeta de Google Drive. ──
 export function extraerIdCarpeta(urlOId: string): string {
-  const match = urlOId.match(/folders\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : urlOId.trim();
+  const valor = urlOId.trim();
+  const match = valor.match(/(?:drive\/folders\/|folders\/)([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : valor;
 }
 
 // ── Busca una subcarpeta por nombre exacto dentro de una carpeta
-//    madre (ej. resolver "01" dentro de "ImpulsoIA - Biblioteca
-//    Técnica"), para no depender de tener los 10 IDs a mano ─────
+//    madre. El primer parámetro puede ser ID o URL de Drive. ─────
 export async function resolverSubcarpetaPorNombre(
   carpetaMadreId: string,
   nombreSubcarpeta: string
 ): Promise<string> {
+  const carpetaMadreRealId = extraerIdCarpeta(carpetaMadreId);
+  const nombreSeguro = nombreSubcarpeta.replace(/'/g, "\\'");
+
   const res: any = await drive.files.list({
-    q: `'${carpetaMadreId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${nombreSubcarpeta}' and trashed=false`,
+    q: `'${carpetaMadreRealId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${nombreSeguro}' and trashed=false`,
     fields: 'files(id, name)',
     pageSize: 5,
   });
@@ -55,7 +54,7 @@ export async function resolverSubcarpetaPorNombre(
   if (!encontrada) {
     throw new Error(
       `No se encontró la subcarpeta "${nombreSubcarpeta}" dentro de la carpeta madre. ` +
-      `Verificá que exista y que esté compartida con: ${credentials.client_email}`
+      `ID utilizado: ${carpetaMadreRealId}. Verificá que exista y que esté compartida con: ${credentials.client_email}`
     );
   }
   return encontrada.id;
@@ -63,12 +62,13 @@ export async function resolverSubcarpetaPorNombre(
 
 // ── Lista todos los PDFs dentro de una carpeta de Drive ─────────
 export async function listarPDFs(carpetaId: string): Promise<ArchivoDrive[]> {
+  const carpetaRealId = extraerIdCarpeta(carpetaId);
   const archivos: ArchivoDrive[] = [];
   let pageToken: string | undefined = undefined;
 
   do {
     const res: any = await drive.files.list({
-      q: `'${carpetaId}' in parents and mimeType='application/pdf' and trashed=false`,
+      q: `'${carpetaRealId}' in parents and mimeType='application/pdf' and trashed=false`,
       fields: 'nextPageToken, files(id, name)',
       pageSize: 200,
       pageToken,
@@ -84,9 +84,6 @@ export async function listarPDFs(carpetaId: string): Promise<ArchivoDrive[]> {
   return archivos;
 }
 
-// ── Lista TODO lo que hay en una carpeta (no solo PDFs), con
-//    tamaño y tipo — para diagnóstico, no la usa el flujo normal
-//    de extracción (que sigue usando listarPDFs de arriba) ───────
 export interface ArchivoDriveCompleto {
   id: string;
   nombre: string;
@@ -95,12 +92,13 @@ export interface ArchivoDriveCompleto {
 }
 
 export async function listarTodosLosArchivos(carpetaId: string): Promise<ArchivoDriveCompleto[]> {
+  const carpetaRealId = extraerIdCarpeta(carpetaId);
   const archivos: ArchivoDriveCompleto[] = [];
   let pageToken: string | undefined = undefined;
 
   do {
     const res: any = await drive.files.list({
-      q: `'${carpetaId}' in parents and trashed=false`,
+      q: `'${carpetaRealId}' in parents and trashed=false`,
       fields: 'nextPageToken, files(id, name, mimeType, size)',
       pageSize: 200,
       pageToken,
@@ -123,8 +121,6 @@ export async function listarTodosLosArchivos(carpetaId: string): Promise<Archivo
   return archivos;
 }
 
-// ── Descarga un archivo puntual a memoria (Buffer), sin dejar
-//    copia en disco ─────────────────────────────────────────────
 export async function descargarArchivo(archivoId: string): Promise<Buffer> {
   const res: any = await drive.files.get(
     { fileId: archivoId, alt: 'media' },
