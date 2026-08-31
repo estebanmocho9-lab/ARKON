@@ -1,16 +1,15 @@
 // ============================================================
 // Extraccion semantica ND (sin clasificacion definitiva).
-// Busca entidades que ya tienen vocabulario en ARKON y atributos
-// fisicos/medibles frecuentes en literatura ES/EN.
+// Reutiliza los diccionarios cientificos de ARKON para reconocer
+// propiedades y atributos en documentos ES/EN.
 // No asigna una entidad a ninguna de las 100 neuronas cientificas.
 // ============================================================
 
 import { PROPIEDADES } from '../diccionarios/propiedades';
+import { ATRIBUTOS } from '../diccionarios/atributos';
 import { HallazgoND } from '../memoria-nd/tipos';
 
-function normalizar(s: string): string {
-  return s.replace(/\s+/g, ' ').trim();
-}
+function normalizar(s: string): string { return s.replace(/\s+/g, ' ').trim(); }
 
 function idioma(texto: string): 'es' | 'en' | 'mixto' {
   const t = texto.toLowerCase();
@@ -24,34 +23,7 @@ function contexto(texto: string, inicio: number, fin: number): string {
   return normalizar(texto.slice(Math.max(0, inicio - 260), Math.min(texto.length, fin + 650)));
 }
 
-const ATRIBUTOS: Array<{ termino: string; sinonimos: string[] }> = [
-  { termino: 'masa', sinonimos: ['mass', 'weight'] },
-  { termino: 'fuerza', sinonimos: ['force'] },
-  { termino: 'longitud', sinonimos: ['length'] },
-  { termino: 'ancho', sinonimos: ['width'] },
-  { termino: 'altura', sinonimos: ['height'] },
-  { termino: 'espesor', sinonimos: ['thickness'] },
-  { termino: 'área', sinonimos: ['area'] },
-  { termino: 'volumen', sinonimos: ['volume'] },
-  { termino: 'temperatura', sinonimos: ['temperature'] },
-  { termino: 'presión', sinonimos: ['pressure'] },
-  { termino: 'tiempo', sinonimos: ['time'] },
-  { termino: 'humedad', sinonimos: ['humidity', 'moisture'] },
-  { termino: 'deformación', sinonimos: ['strain', 'deformation'] },
-  { termino: 'desplazamiento', sinonimos: ['displacement'] },
-  { termino: 'velocidad', sinonimos: ['velocity', 'speed'] },
-  { termino: 'aceleración', sinonimos: ['acceleration'] },
-  { termino: 'frecuencia', sinonimos: ['frequency'] },
-  { termino: 'concentración', sinonimos: ['concentration'] },
-  { termino: 'porcentaje', sinonimos: ['percentage', 'percent'] },
-  { termino: 'contenido de agua', sinonimos: ['water content', 'moisture content'] },
-  { termino: 'diámetro', sinonimos: ['diameter'] },
-  { termino: 'porosidad', sinonimos: ['porosity'] },
-];
-
-function escapar(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function escapar(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function crearHallazgo(
   neuronId: string,
@@ -68,9 +40,7 @@ function crearHallazgo(
   const ctx = contexto(texto, indice, indice + termino.length);
   const lang = idioma(ctx);
   return {
-    neuronId,
-    tipo,
-    campo,
+    neuronId, tipo, campo,
     textoOriginal: termino,
     textoNormalizado: termino.toLowerCase(),
     entidadCandidata: termino,
@@ -78,74 +48,55 @@ function crearHallazgo(
     idioma: lang,
     confianza,
     evidencia: {
-      documento,
-      pagina,
-      fragmento: ctx,
-      idioma: lang,
+      documento, pagina, fragmento: ctx, idioma: lang,
       tipoDocumento: 'desconocido',
-      posicionInicio: indice,
-      posicionFin: indice + termino.length,
+      posicionInicio: indice, posicionFin: indice + termino.length,
     },
     metadatos,
   };
 }
 
-/**
- * Extrae menciones de propiedades conocidas por el diccionario y
- * atributos primitivos. Son CANDIDATOS: el clasificador posterior
- * decidirá si la mención realmente representa esa entidad.
- */
+/** Reconoce candidatos usando los vocabularios ya existentes en ARKON. */
 export function extraerCandidatosSemanticosND(
-  texto: string,
-  pagina: number,
-  documento: string,
-  neuronId: string,
+  texto: string, pagina: number, documento: string, neuronId: string,
 ): HallazgoND[] {
   const out: HallazgoND[] = [];
   const normalizado = texto.replace(/\s+/g, ' ');
 
   for (const propiedad of PROPIEDADES) {
-    const terminos = [propiedad.nombre_es, propiedad.nombre_en, ...(propiedad.sinonimos || [])]
-      .filter((t): t is string => !!t && t.trim().length >= 4);
-    const unicos = [...new Set(terminos.map(t => t.trim()))];
-    for (const termino of unicos) {
-      const re = new RegExp(`\\b${escapar(termino)}\\b`, 'giu');
+    const terminos = [...new Set([
+      propiedad.nombre_es, propiedad.nombre_en, ...(propiedad.sinonimos || []), ...(propiedad.simbolos || []),
+    ].filter((t): t is string => !!t && t.trim().length >= 2).map(t => t.trim()))];
+
+    for (const termino of terminos) {
+      // Simbolos de una letra son ambiguos; solo se reconocen cerca de
+      // una expresion de formula/valor para evitar falsos positivos masivos.
+      const esSimbolo = (propiedad.simbolos || []).includes(termino);
+      const patron = esSimbolo && termino.length === 1
+        ? `(?<![A-Za-z0-9])${escapar(termino)}(?=\\s*[=:])`
+        : `(?<![\\p{L}\\p{N}])${escapar(termino)}(?![\\p{L}\\p{N}])`;
+      const re = new RegExp(patron, 'giu');
       let m: RegExpExecArray | null;
       while ((m = re.exec(normalizado))) {
-        out.push(crearHallazgo(
-          neuronId,
-          'PROPIEDAD',
-          'mencion_propiedad',
-          m[0],
-          normalizado,
-          pagina,
-          documento,
-          m.index,
-          0.7,
-          { propiedadDiccionario: propiedad.id, terminoDiccionario: termino },
-        ));
+        out.push(crearHallazgo(neuronId, 'PROPIEDAD', 'mencion_propiedad', m[0], normalizado,
+          pagina, documento, m.index, esSimbolo ? 0.62 : 0.7,
+          { propiedadDiccionario: propiedad.id, terminoDiccionario: termino, esSimbolo }));
       }
     }
   }
 
+  // Los atributos descriptivos de ARKON son distintos de las propiedades
+  // cuantitativas: pueden aparecer sin ningun numero al lado.
   for (const atributo of ATRIBUTOS) {
-    const terminos = [atributo.termino, ...atributo.sinonimos];
+    const terminos = [...new Set([atributo.nombre_es, atributo.nombre_en]
+      .filter(Boolean).map(t => t.trim()).filter(t => t.length >= 4))];
     for (const termino of terminos) {
-      const re = new RegExp(`\\b${escapar(termino)}\\b`, 'giu');
+      const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapar(termino)}(?![\\p{L}\\p{N}])`, 'giu');
       let m: RegExpExecArray | null;
       while ((m = re.exec(normalizado))) {
-        out.push(crearHallazgo(
-          neuronId,
-          'ATRIBUTO',
-          'atributo_primitivo',
-          m[0],
-          normalizado,
-          pagina,
-          documento,
-          m.index,
-          0.55,
-          { atributoBase: atributo.termino, sinonimo: termino !== atributo.termino },
-        ));
+        out.push(crearHallazgo(neuronId, 'ATRIBUTO', 'atributo_descriptivo', m[0], normalizado,
+          pagina, documento, m.index, 0.62,
+          { atributoDiccionario: atributo.id, terminoDiccionario: termino }));
       }
     }
   }
