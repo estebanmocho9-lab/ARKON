@@ -10,7 +10,11 @@ import { HallazgoND } from '../extraction-neurons/memoria-nd/tipos';
 
 let preparada = false;
 
-async function prepararTabla(): Promise<void> {
+/**
+ * Garantiza que el destino documental ND exista en Turso.
+ * Es idempotente: no borra ni altera los registros existentes.
+ */
+export async function prepararTablaND(): Promise<void> {
   if (preparada) return;
   await turso.execute(`
     CREATE TABLE IF NOT EXISTS nd_hallazgos_raw (
@@ -81,7 +85,7 @@ function claveUnica(h: HallazgoND): string {
 
 export async function guardarHallazgosND(hallazgos: HallazgoND[]): Promise<void> {
   if (!hallazgos.length) return;
-  await prepararTabla();
+  await prepararTablaND();
 
   for (const h of hallazgos) {
     const e = h.evidencia;
