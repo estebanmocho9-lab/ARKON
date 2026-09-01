@@ -10,7 +10,28 @@
 // ============================================================
 
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+
 dotenv.config();
+
+// En algunos entornos Cloud Shell/.env gestionados por dotenvx,
+// dotenv puede no exponer una variable aunque exista literalmente
+// en el archivo. Para esta prueba de solo lectura hacemos un
+// fallback seguro leyendo únicamente CARPETA_MADRE_DRIVE_ID.
+function obtenerCarpetaMadreConfigurada(): string | undefined {
+  const desdeEntorno = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
+  if (desdeEntorno) return desdeEntorno;
+
+  try {
+    const contenido = fs.readFileSync('.env', 'utf8');
+    const linea = contenido.split(/\r?\n/).find(l => /^CARPETA_MADRE_DRIVE_ID\s*=/.test(l));
+    if (!linea) return undefined;
+    const valor = linea.slice(linea.indexOf('=') + 1).trim().replace(/^['"]|['"]$/g, '');
+    return valor || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from './src/extraction-neurons/drive/driveReader';
 import { extraerPaginas } from './src/extraction-neurons/pdf/pdfParser';
@@ -33,7 +54,7 @@ function imprimirEjemplos(hallazgos: HallazgoND[], tipo: HallazgoND['tipo'], lim
 async function main() {
   const numeroCarpeta = process.argv[2] || '01';
   const filtroNombre = process.argv[3]?.toLowerCase();
-  const configurada = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
+  const configurada = obtenerCarpetaMadreConfigurada();
   if (!configurada) {
     throw new Error(
       'Falta CARPETA_MADRE_DRIVE_ID. Cargá el ID en .env o exportalo en la sesión.'
