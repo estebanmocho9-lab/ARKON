@@ -1,8 +1,8 @@
 // ============================================================
 // probarUnPDF.ts
-// Prueba el motor ND sobre UN SOLO PDF, mostrando por pantalla
-// evidencia documental amplia. NO guarda nada en Turso/Supabase
-// ni toca checkpoints.
+// Prueba el motor ND sobre UN SOLO PDF y persiste sus hallazgos
+// documentales en Turso (nd_hallazgos_raw).
+// No toca checkpoints ni escribe en las tablas de la NE.
 //
 // Uso:
 //   npx ts-node --transpile-only probarUnPDF.ts 01
@@ -14,10 +14,6 @@ import * as fs from 'fs';
 
 dotenv.config();
 
-// En algunos entornos Cloud Shell/.env gestionados por dotenvx,
-// dotenv puede no exponer una variable aunque exista literalmente
-// en el archivo. Para esta prueba de solo lectura hacemos un
-// fallback seguro leyendo únicamente CARPETA_MADRE_DRIVE_ID.
 function obtenerCarpetaMadreConfigurada(): string | undefined {
   const desdeEntorno = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
   if (desdeEntorno) return desdeEntorno;
@@ -37,6 +33,8 @@ import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCar
 import { extraerPaginas } from './src/extraction-neurons/pdf/pdfParser';
 import { extraerNDCompleto } from './src/extraction-neurons/base/extractorNDCompleto';
 import { HallazgoND } from './src/extraction-neurons/memoria-nd/tipos';
+import { guardarHallazgosND, prepararTablaND } from './src/turso/guardarHallazgosND';
+import { turso } from './src/turso/tursoClient';
 
 function contar(hallazgos: HallazgoND[], tipo: HallazgoND['tipo']): number {
   return hallazgos.filter(h => h.tipo === tipo).length;
@@ -56,9 +54,7 @@ async function main() {
   const filtroNombre = process.argv[3]?.toLowerCase();
   const configurada = obtenerCarpetaMadreConfigurada();
   if (!configurada) {
-    throw new Error(
-      'Falta CARPETA_MADRE_DRIVE_ID. Cargá el ID en .env o exportalo en la sesión.'
-    );
+    throw new Error('Falta CARPETA_MADRE_DRIVE_ID. Cargá el ID en .env o exportalo en la sesión.');
   }
 
   const carpetaId = await resolverSubcarpetaPorNombre(extraerIdCarpeta(configurada), numeroCarpeta);
@@ -82,13 +78,21 @@ async function main() {
   const hallazgos: HallazgoND[] = [];
   for (const { pagina, texto } of paginas) {
     if (!texto || texto.trim().length < 20) continue;
-    hallazgos.push(...extraerNDCompleto(texto, pagina, elegido.nombre, `ND_TEST_${numeroCarpeta}`));
+    const encontrados = extraerNDCompleto(texto, pagina, elegido.nombre, `ND_TEST_${numeroCarpeta}`);
+    for (const h of encontrados) {
+      h.metadatos = {
+        ...(h.metadatos || {}),
+        documentoDriveId: elegido.id,
+      };
+    }
+    hallazgos.push(...encontrados);
   }
 
   console.log('\n════════════════════════════════════════════════════════════');
   console.log('📊 RESULTADO — ND EXTRACCIÓN DOCUMENTAL');
   console.log('════════════════════════════════════════════════════════════');
   console.log(`Documento: ${elegido.nombre}`);
+  console.log(`Drive ID:  ${elegido.id}`);
   console.log(`Páginas:   ${paginas.length}`);
   console.log(`Hallazgos: ${hallazgos.length}\n`);
   console.log(`DEFINICIONES:     ${contar(hallazgos, 'DEFINICION')}`);
@@ -112,10 +116,23 @@ async function main() {
     imprimirEjemplos(hallazgos, tipo);
   }
 
+  console.log('\n💾 Guardando hallazgos ND en Turso...');
+  await prepararTablaND();
+  await guardarHallazgosND(hallazgos);
+
+  const verificacion = await turso.execute({
+    sql: `SELECT COUNT(*) AS total FROM nd_hallazgos_raw WHERE documento_drive_id = ? AND neuron_id = ?`,
+    args: [elegido.id, `ND_TEST_${numeroCarpeta}`],
+  });
+  const guardados = Number(verificacion.rows[0]?.total ?? 0);
+
+  console.log(`✅ Turso: ${guardados} hallazgos ND asociados a este PDF.`);
+  console.log(`   Extraídos por ND: ${hallazgos.length}`);
+  console.log(`   Diferencia:      ${hallazgos.length - guardados} (normal si hubo duplicados por la clave única).`);
   console.log('\n🏁 Prueba terminada.');
-  console.log('   No se guardó nada en Turso ni Supabase.');
+  console.log('   ND guardó su evidencia documental en Turso: nd_hallazgos_raw.');
+  console.log('   No se escribió en propiedades_extraidas ni en las tablas científicas de la NE.');
   console.log('   No se tocó ningún checkpoint.');
-  console.log('   ND conserva evidencia documental; NE queda encargada de la extracción cuantitativa fina.');
 }
 
 main().catch(err => { console.error('Error general:', err); process.exit(1); });
