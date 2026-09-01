@@ -1,7 +1,3 @@
 // src/extraction-neurons/neuronas/ND07.ts
-import { NeuronNDBase } from '../base/NeuronNDBase';
-
-export class ND07 extends NeuronNDBase {
-  readonly neuronId = 'ND-07';
-  readonly numeroCarpeta = '07';
-}
+import { NeuronNDBaseV2 } from '../base/NeuronNDBaseV2';
+export class ND07 extends NeuronNDBaseV2 { readonly neuronId='ND-07'; readonly numeroCarpeta='07'; }
