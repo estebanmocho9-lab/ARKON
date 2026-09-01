@@ -12,14 +12,7 @@ const esc=(s:string)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const UNITS=String.raw`(?:%|ppm|ppb|°C|ºC|K|MPa|GPa|kPa|Pa|N|kN|kg|g|mg|µg|um|μm|mm|cm|m|m²|m2|m3|m³|kg/m3|kg/m³|g/cm3|g/cm³|W/mK|W/m·K|W/(m·K)|J/g|J/kg|kJ/kg|MJ/kg|Hz|s|min|h|d|mol|mol/L|M|V|A|Ω|Ohm|mS/cm|S/m)`;
 const NUM=String.raw`[-+]?\d+(?:[.,]\d+)?(?:\s*[×x*]\s*10\s*[-+]?\d+)?`;
 
-const MATERIAL_TERMS=[
- 'cemento Portland','pasta de cemento','cemento','yeso','gypsum','hormigón','hormigon','concreto','concrete','mortero','mortar',
- 'arena','sand','arcilla','clay','vidrio','glass','fibra de vidrio','glass fiber','acero','steel','aluminio','aluminum',
- 'cobre','copper','hierro','iron','madera','wood','plástico','plastico','plastic','resina','resin','polímero','polimero','polymer',
- 'epoxi','epoxy','cerámica','ceramica','ceramic','ladrillo','brick','árido','arido','agregado','aggregate','composite','compuesto',
- 'óxido de aluminio','oxido de aluminio','óxido de calcio','oxido de calcio','óxido de hierro','oxido de hierro',
- 'óxido de silicio','oxido de silicio','óxido de sodio','oxido de sodio','alúmina','alumina','sílice','silica'
-];
+const MATERIAL_TERMS=['cemento Portland','pasta de cemento','cemento','yeso','gypsum','hormigón','hormigon','concreto','concrete','mortero','mortar','arena','sand','arcilla','clay','vidrio','glass','fibra de vidrio','glass fiber','acero','steel','aluminio','aluminum','cobre','copper','hierro','iron','madera','wood','plástico','plastico','plastic','resina','resin','polímero','polimero','polymer','epoxi','epoxy','cerámica','ceramica','ceramic','ladrillo','brick','árido','arido','agregado','aggregate','composite','compuesto','óxido de aluminio','oxido de aluminio','óxido de calcio','oxido de calcio','óxido de hierro','oxido de hierro','óxido de silicio','oxido de silicio','óxido de sodio','oxido de sodio','alúmina','alumina','sílice','silica'];
 const NORMA=/\b(?:ASTM|ISO|IRAM|EN|UNE|AASHTO|DIN|BS|JIS|IEC|NF|CSA|GB|ABNT)\s*[- ]?\s*[A-Z]?\s*\d{2,6}(?:[-:]\d{2,4})?(?:\s*[-:]?\s*[A-Z]\d{0,3})?\b/giu;
 const COMPONENTE=/\b(?:componente|component|constituyente|constituent|fase|phase|aditivo|additive|matriz|matrix|ligante|binder|relleno|filler)\s*(?::|=|denominado\s+|llamado\s+|called\s+|named\s+)?\s*([^,.;:\n]{2,90})/giu;
 const METODO=/\b(?:método|metodo|method|procedimiento|procedure|ensayo|test|técnica|tecnica|technique|protocolo|protocol)\s+(?:de\s+|del\s+|para\s+|the\s+|of\s+|for\s+)?([^,.;:\n]{2,100})/giu;
@@ -83,7 +76,7 @@ export function extraerDocumentalExhaustivoNDV3(texto:string,pagina:number,docum
  for(const e of es){
   const b0=bs.find(b=>b.start<=e.pos&&e.pos<=b.end)||bs[0];if(!b0)continue;const b=sentenceWindow(b0,e.pos);
   add(make({neuronId,type:'EVIDENCIA',entity:e.name,aspect:'bloque_documental_completo',data:b.text,pagina,documento,start:b.start,end:b.end,confidence:.72,rel:relation(e.name,b.text),meta:{entidadTipo:e.type,entidadMeta:e.meta}}));
-  for(const [aspect,type,rx] of ASPECTS){rx.lastIndex=0;if(!rx.test(b.text))continue;const confidence=aspect==='definicion'||aspect==='que_es'?.92:.80;add(make({neuronId,type,entity:e.name,aspect,data:b.text,pagina,documento,start:b.start,end:b.end,confidence,rel:relation(e.name,b.text),meta:{entidadTipo:e.type,entidadMeta:e.meta,disparador:rx.source}}));}
+  for(const [aspect,type,rx] of ASPECTS){rx.lastIndex=0;if(!rx.test(b.text))continue;const confidence=(aspect==='definicion'||aspect==='que_es')?.92:.80;add(make({neuronId,type,entity:e.name,aspect,data:b.text,pagina,documento,start:b.start,end:b.end,confidence,rel:relation(e.name,b.text),meta:{entidadTipo:e.type,entidadMeta:e.meta,disparador:rx.source}}));}
  }
  for(const b of bs){if(b.text.length<120)continue;if(!/(?:defin|property|propiedad|material|component|componente|method|m[eé]todo|measurement|medici[oó]n|application|aplicaci[oó]n|composition|composici[oó]n|behavior|comportamiento|condition|condici[oó]n|instrument|instrumento|standard|norma|formula|fórmula|relationship|relaci[oó]n|effect|efecto)/i.test(b.text))continue;const k=`UNANCHORED|${b.start}|${b.end}`;if(seen.has(k))continue;seen.add(k);const lang=idioma(b.text);out.push({neuronId,tipo:'EVIDENCIA',campo:'bloque_tecnico_no_anclado',textoOriginal:b.text,textoNormalizado:b.text.toLowerCase(),contexto:b.text,idioma:lang,confianza:.42,evidencia:{documento,pagina,fragmento:b.text,idioma:lang,tipoDocumento:'desconocido',posicionInicio:b.start,posicionFin:b.end},metadatos:{extractor:'extractorDocumentalExhaustivoNDV4',requiereAnclajePosterior:true}});}
  return out;
