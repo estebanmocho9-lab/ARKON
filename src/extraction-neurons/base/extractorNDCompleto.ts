@@ -1,46 +1,25 @@
-import { extraerDefinicionesPropiedadesCompleto } from './extractorDefinicionesCompleto';
-import { extraerNDUniversal } from './extractorNDUniversal';
-import { extraerMetadatosCientificosND } from './extractorMetadatosCientificosND';
+import { extraerDocumentalExhaustivoNDV3 } from './extractorDocumentalExhaustivoNDV3';
 import { extraerDatosCientificosND } from './extractorDatosCientificosND';
-import { extraerContextualND } from './extractorContextualND';
 import { HallazgoND } from '../memoria-nd/tipos';
 
+/**
+ * ND completo: primero identifica entidades concretas y luego conserva toda la
+ * informacion documental asociada por aspecto. No resume definiciones.
+ * Los datos numericos y formulas se conservan adicionalmente como evidencia
+ * cuantitativa cruda para que no se pierdan aunque aun no esten anclados.
+ */
 export function extraerNDCompleto(texto:string,pagina:number,documento:string,neuronId:string):HallazgoND[]{
-  // El universal ya aporta evidencia documental general. Las definiciones,
-  // materiales y propiedades se reconstruyen abajo con reglas más estrictas.
-  const base=extraerNDUniversal(texto,pagina,documento,neuronId)
-    .filter(h=>!['DEFINICION','MATERIAL','PROPIEDAD','ATRIBUTO'].includes(h.tipo));
-
-  const defs=extraerDefinicionesPropiedadesCompleto(texto).map(h=>({
-    neuronId,
-    tipo:'DEFINICION' as const,
-    campo:h.campo,
-    textoOriginal:h.contenido.trim(),
-    textoNormalizado:h.contenido.trim().toLowerCase(),
-    entidadCandidata:h.nombre_propiedad,
-    entidadPrincipal:h.nombre_propiedad,
-    aspecto:'definicion',
-    datoDocumental:h.contenido.trim(),
-    contexto:h.contenido.trim(),
-    idioma:h.idioma,
-    confianza:.78,
-    evidencia:{documento,pagina,fragmento:h.contenido.trim(),idioma:h.idioma,tipoDocumento:'desconocido' as const},
-    metadatos:{extractor:'extractorDefinicionesCompleto',entidadPrincipal:h.nombre_propiedad,aspecto:'definicion',datoDocumental:h.contenido.trim()}
-  } satisfies HallazgoND));
-
-  const contextual=extraerContextualND(texto,pagina,documento,neuronId);
-  const metadatos=extraerMetadatosCientificosND(texto,pagina,documento,neuronId);
-  const datos=extraerDatosCientificosND(texto,pagina,documento,neuronId);
-  return dedup([...base,...defs,...contextual,...metadatos,...datos]);
+ const exhaustivo=extraerDocumentalExhaustivoNDV3(texto,pagina,documento,neuronId);
+ const cuantitativo=extraerDatosCientificosND(texto,pagina,documento,neuronId);
+ return dedup([...exhaustivo,...cuantitativo]);
 }
 
-function dedup(h:HallazgoND[]){
-  const s=new Set<string>();
-  return h.filter(x=>{
-    const e=x.evidencia;
-    const k=[x.neuronId,x.tipo,x.campo||'',e.documento,e.pagina,e.posicionInicio??'',e.posicionFin??'',x.entidadPrincipal||x.entidadCandidata||'',x.aspecto||'',x.datoDocumental||x.textoNormalizado].join('|');
-    if(s.has(k)) return false;
-    s.add(k);
-    return true;
-  });
+function dedup(hallazgos:HallazgoND[]):HallazgoND[]{
+ const seen=new Set<string>();
+ return hallazgos.filter(h=>{
+  const e=h.evidencia;
+  const key=[h.neuronId,h.tipo,h.campo||'',e.documento,e.pagina,e.posicionInicio??'',e.posicionFin??'',h.entidadPrincipal||h.entidadCandidata||'',h.aspecto||'',h.datoDocumental||h.textoNormalizado].join('|');
+  if(seen.has(key))return false;
+  seen.add(key);return true;
+ });
 }
