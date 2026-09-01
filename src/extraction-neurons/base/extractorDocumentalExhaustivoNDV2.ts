@@ -1,0 +1,75 @@
+import { PROPIEDADES } from '../diccionarios/propiedades';
+import { ATRIBUTOS } from '../diccionarios/atributos';
+import { HallazgoND } from '../memoria-nd/tipos';
+
+const norm=(s:string)=>s.replace(/\s+/g,' ').trim();
+const esc=(s:string)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+type Block={text:string;start:number;end:number};
+type Entity={type:HallazgoND['tipo'];name:string;pos:number;meta?:Record<string,unknown>};
+
+const MATERIAL=/\b(?:cemento(?:\s+[\p{L}\d-]+){0,6}|pasta de cemento|cement paste|yeso|gypsum|hormig[oó]n|concreto|concrete|mortero|mortar|arena|sand|arcilla|clay|vidrio|glass|fibra de vidrio|glass fiber|acero(?:\s+[\p{L}\d-]+){0,5}|steel(?:\s+[\p{L}\d-]+){0,5}|aluminio|aluminum|cobre|copper|hierro|iron|madera|wood|pl[aá]stico|plastic|resina|resin|pol[ií]mero|polymer|epoxi|epoxy|cer[aá]mica|ceramic|ladrillo|brick|[aá]rido(?:\s+[\p{L}\d-]+){0,3}|agregado(?:\s+[\p{L}\d-]+){0,3}|aggregate(?:\s+[\p{L}\d-]+){0,3}|composite|compuesto(?:\s+[\p{L}\d-]+){0,5})\b/giu;
+const NORMA=/\b(?:ASTM|ISO|IRAM|EN|UNE|AASHTO|DIN|BS|JIS|IEC|NF|CSA|GB|ABNT)\s*[- ]?\s*[A-Z]?\s*\d{2,6}(?:[-:]\d{2,4})?(?:\s*[-:]?\s*[A-Z]\d{0,3})?\b/giu;
+const COMPONENTE=/\b(?:componente|component|constituyente|constituent|fase|phase|aditivo|additive|agregado|aggregate|matriz|matrix|ligante|binder|relleno|filler)\s+(?:denominado\s+|llamado\s+|called\s+|named\s+)?([^,.;:\n]{2,100})/giu;
+const METODO=/\b(?:método|metodo|method|procedimiento|procedure|ensayo|test|técnica|technique|protocolo|protocol)\s+(?:de\s+|del\s+|para\s+|the\s+|of\s+|for\s+)?([^,.;:\n]{2,100})/giu;
+const INSTRUMENTO=/\b(?:instrumento|instrument|equipo|equipment|aparato|apparatus|dispositivo|device|sensor|sonda|probe|microscopio|microscope|espectrómetro|spectrometer|balanza|balance|termómetro|thermometer|prensa|press|extensómetro|extensometer)\s+(?:de\s+|para\s+|the\s+|for\s+)?([^,.;:\n]{2,100})/giu;
+
+const ASPECTS:Array<[string,HallazgoND['tipo'],RegExp]>=[
+ ['definicion','DEFINICION',/\b(?:se define como|se define|definid[oa] como|definition|defined as|is defined as|refers to|se refiere a|means|significa)\b/iu],
+ ['que_es','DEFINICION',/\b(?:es un|es una|is a|is an|consiste en|consists of|denota|denotes)\b/iu],
+ ['que_mide','PROPIEDAD',/\b(?:mide|medir|medición|measurement|measures?|quantifies?|cuantifica|determina|determines?|indica|indicates)\b/iu],
+ ['que_no_mide','PROPIEDAD',/\b(?:no mide|no cuantifica|no representa|does not measure|does not quantify|not a measure of|no debe confundirse|should not be confused)\b/iu],
+ ['significado','DEFINICION',/\b(?:significa|significado|meaning|means|representa|represents?|interpreta|interpreted)\b/iu],
+ ['fundamento','DEFINICION',/\b(?:fundamento|principio|principle|basis|mechanism|mecanismo|theory|teoría|based on|basado en)\b/iu],
+ ['composicion','EVIDENCIA',/\b(?:composición|composicion|composition|composed of|consists of|contains|contiene|constituido por|formed by|formado por|made of|porcentaje|percentage|proporción|proportion|ratio)\b/iu],
+ ['estructura','EVIDENCIA',/\b(?:estructura|structure|microestructura|microstructure|crystal|cristal|grain|grano|pore structure|estructura de poros)\b/iu],
+ ['subpropiedad','PROPIEDAD',/\b(?:subpropiedad|sub-property|subproperties|parámetros|parameters?|variables internas|internal variables|tipos de|types of|classified as|clasificada como)\b/iu],
+ ['valor','MAGNITUD',/\b(?:valor|value|measured at|medido a|measured value|reported value|rango|range|between|entre|maximum|minimum|typical|típico|average|promedio)\b/iu],
+ ['unidad','MAGNITUD',/\b(?:unidad|unit|units|expressed in|expresado en|SI units|unidades SI)\b/iu],
+ ['formula','FORMULA',/\b(?:formula|fórmula|equation|ecuación|calculated from|calculado a partir de)\b|[=≈≤≥]/iu],
+ ['como_se_determina','METODO',/\b(?:se determina|determinación|determination|determined by|determined using|se mide|measured by|measured using|method|método|procedure|procedimiento|test|ensayo|technique|técnica)\b/iu],
+ ['procedimiento','METODO',/\b(?:procedure|procedimiento|steps?|pasos|first|then|finally|primero|después|finalmente|prepare|preparar|preparation|preparación)\b/iu],
+ ['instrumento','INSTRUMENTO',/\b(?:instrument|instrumento|equipment|equipo|apparatus|aparato|device|dispositivo|sensor|sonda|microscope|microscopio|spectrometer|espectrómetro)\b/iu],
+ ['calibracion','INSTRUMENTO',/\b(?:calibrat|calibración|calibracion|calibrated|calibrado|reference material|material de referencia|standardization|estandarización)\b/iu],
+ ['condicion','CONDICION',/\b(?:temperature|temperatura|pressure|presión|presion|humidity|humedad|time|tiempo|age|edad|concentration|concentración|pH|atmosphere|atmósfera|atmosfera|vacuum|vacío|dry|seco|wet|húmedo|humedo|saturated|saturado|curing|curado|setting|fraguado)\b/iu],
+ ['dependencia','RELACION',/\b(?:depends on|depende de|dependent on|dependiente de|influenced by|influido por|affected by|afectado por|as a function of|en función de)\b/iu],
+ ['relacion','RELACION',/\b(?:related to|relacionado con|correlates with|correlaciona con|associated with|asociado con|proportional to|proporcional a|inversely|inversamente|directly|directamente)\b/iu],
+ ['comparacion','RELACION',/\b(?:compared with|compared to|comparado con|comparada con|in comparison|en comparación|similar to|similar a|different from|diferente de|differs from|se diferencia de|whereas|mientras que)\b/iu],
+ ['efecto','COMPORTAMIENTO',/\b(?:effect|efecto|consequence|consecuencia|results in|resulta en|leads to|conduce a|causes?|causa|produce|produces)\b/iu],
+ ['comportamiento','COMPORTAMIENTO',/\b(?:behavior|behaviour|comportamiento|increases?|increased|decreases?|decreased|aumenta|aumentado|disminuye|disminuido|evolves?|evoluciona|response|respuesta|transition|transición|reversible|irreversible)\b/iu],
+ ['aplicacion','APLICACION',/\b(?:application|aplicación|aplicacion|used for|used in|se utiliza|se usa|utilizado para|utilizada para|suitable for|adecuado para|recommended use|uso recomendado)\b/iu],
+ ['ventaja','APLICACION',/\b(?:advantage|advantages|ventaja|ventajas|benefit|benefits|beneficio|beneficios|particularly useful|especially useful)\b/iu],
+ ['limitacion','DEFINICION',/\b(?:limitation|limitations|limitación|limitaciones|drawback|desventaja|disadvantage|not suitable|no es adecuado|not applicable|no aplica)\b/iu],
+ ['excepcion','DEFINICION',/\b(?:exception|exceptions|excepción|excepciones|except when|excepto cuando|unless|salvo que)\b/iu],
+ ['riesgo_seguridad','CONDICION',/\b(?:risk|risks|riesgo|riesgos|hazard|hazards|peligro|peligros|safety|seguridad|toxic|tóxico|corrosive|corrosivo)\b/iu],
+ ['ejemplo','EVIDENCIA',/\b(?:example|examples|ejemplo|ejemplos|for instance|por ejemplo|such as|como por ejemplo)\b/iu],
+ ['norma','NORMA',/\b(?:ASTM|ISO|IRAM|EN|UNE|AASHTO|DIN|BS|JIS|IEC|NF|CSA|GB|ABNT|standard|norma|specification|especificación)\b/iu],
+ ['evidencia_experimental','EVIDENCIA',/\b(?:experimental|experimentally|experimentalmente|measured|measured experimentally|observed|observado|test results|resultados de ensayo|empirical|empírico)\b/iu],
+ ['evidencia_teorica','EVIDENCIA',/\b(?:theoretical|theoretically|teórico|teóricamente|theory predicts|la teoría predice|simulation|simulación|simulated|simulado)\b/iu],
+];
+
+function idioma(t:string):'es'|'en'|'mixto'{const s=t.toLowerCase();const es=(s.match(/\b(el|la|los|las|de|del|que|una|un|para|con|se|como|mide|propiedad|material|muestra|ensayo|resultado|cuando|entre|es|por)\b/g)||[]).length;const en=(s.match(/\b(the|of|and|is|are|a|an|for|with|by|as|measure|measurement|property|material|sample|test|result|when|between)\b/g)||[]).length;return es&&en?'mixto':en>es?'en':'es';}
+
+function blocks(texto:string):Block[]{const out:Block[]=[];let cursor=0;for(const raw of texto.split(/\n{2,}/)){const start=texto.indexOf(raw,cursor);cursor=(start<0?cursor:start)+raw.length;const text=norm(raw);if(text.length>=30)out.push({text,start:start<0?0:start,end:(start<0?0:start)+raw.length});}if(!out.length&&texto.trim())out.push({text:norm(texto),start:0,end:texto.length});return out;}
+function blockFor(texto:string,pos:number):Block{const bs=blocks(texto);let i=bs.findIndex(b=>b.start<=pos&&pos<=b.end);if(i<0)i=0;let a=i,b=i;const cur=bs[i]?.text||'';if(i>0,/^(?:where|which|that|this|these|it|they|donde|que|el cual|la cual|por lo tanto|therefore|thus|además|ademas|also|in addition|however|sin embargo)\b/i.test(cur))a--;if(i+1<bs.length&&/(?:defin|means|refers|consists|mide|measure|determina|determined|method|método|procedure|procedimiento)/i.test(cur))b++;return {text:bs.slice(a,b+1).map(x=>x.text).join(' '),start:bs[a].start,end:bs[b].end};}
+
+function entities(texto:string):Entity[]{const out:Entity[]=[];const add=(type:HallazgoND['tipo'],name:string,pos:number,meta?:Record<string,unknown>)=>{const n=norm(name).replace(/^["'“”]+|["'“”]+$/g,'');if(n.length>=3&&n.length<=120)out.push({type,name:n,pos,meta});};
+ for(const p of PROPIEDADES){for(const term of new Set([p.nombre_es,p.nombre_en,...(p.sinonimos||[])].filter((x):x is string=>!!x&&x.trim().length>=4))){const r=new RegExp(`(?<![\\p{L}\\p{N}])${esc(term)}(?![\\p{L}\\p{N}])`,'giu');let m:RegExpExecArray|null;while((m=r.exec(texto)))add('PROPIEDAD',p.nombre_es||m[0],m.index,{diccionario:p.id,termino:m[0]});}}
+ for(const a of ATRIBUTOS){for(const term of new Set([a.nombre_es,a.nombre_en].filter(Boolean) as string[])){const r=new RegExp(`(?<![\\p{L}\\p{N}])${esc(term)}(?![\\p{L}\\p{N}])`,'giu');let m:RegExpExecArray|null;while((m=r.exec(texto)))add('ATRIBUTO',m[0],m.index,{diccionario:a.id});}}
+ for(const [r,type] of [[MATERIAL,'MATERIAL'],[NORMA,'NORMA']] as const){r.lastIndex=0;let m:RegExpExecArray|null;while((m=r.exec(texto)))add(type,m[0],m.index);}
+ for(const [r,type] of [[COMPONENTE,'COMPONENTE'],[METODO,'METODO'],[INSTRUMENTO,'INSTRUMENTO']] as const){r.lastIndex=0;let m:RegExpExecArray|null;while((m=r.exec(texto)))add(type,m[1]||m[0],m.index,{disparador:m[0]});}
+ return out;}
+
+function relation(name:string,texto:string){const i=texto.toLowerCase().indexOf(name.toLowerCase());if(i<0)return;const z=texto.slice(Math.max(0,i-220),i+name.length+260).toLowerCase();const rs:Array<[string,RegExp]>=[['depende_de',/depende de|depends on|dependent on/],['afecta',/afecta|affects|influye|influences/],['afectada_por',/afectado por|affected by/],['relacionada_con',/relacionado con|related to|associated with|asociado con/],['comparada_con',/comparado con|compared with|similar to|similar a|different from|diferente de/],['utilizada_en',/utilizado en|utilizada en|used in|used for|se utiliza|se usa/],['determinada_por',/determinada por|determined by|measured by/]];return rs.find(([,re])=>re.test(z))?.[0];}
+
+function make(args:{neuronId:string;type:HallazgoND['tipo'];entity:string;aspect:string;data:string;pagina:number;documento:string;start:number;end:number;confidence:number;rel?:string;meta?:Record<string,unknown>}):HallazgoND{const lang=idioma(args.data);return {neuronId:args.neuronId,tipo:args.type,campo:`${args.type.toLowerCase()}_${args.aspect}`,textoOriginal:args.data,textoNormalizado:args.data.toLowerCase(),entidadCandidata:args.entity,entidadPrincipal:args.entity,aspecto:args.aspect,datoDocumental:args.data,relacionEntidad:args.rel,contexto:args.data,idioma:lang,confianza:args.confidence,evidencia:{documento:args.documento,pagina:args.pagina,fragmento:args.data,idioma:lang,tipoDocumento:'desconocido',posicionInicio:args.start,posicionFin:args.end},metadatos:{extractor:'extractorDocumentalExhaustivoNDV2',entidadPrincipal:args.entity,aspecto:args.aspect,completo:true,...(args.meta||{})}};}
+
+export function extraerDocumentalExhaustivoNDV2(texto:string,pagina:number,documento:string,neuronId:string):HallazgoND[]{const out:HallazgoND[]=[];const seen=new Set<string>();
+ for(const e of entities(texto)){
+  const b=blockFor(texto,e.pos);if(b.text.length<30)continue;
+  const base=`${e.type}|${e.name.toLowerCase()}|${b.start}|base`;if(!seen.has(base)){seen.add(base);out.push(make({neuronId,type:'EVIDENCIA',entity:e.name,aspect:'bloque_documental_completo',data:b.text,pagina,documento,start:b.start,end:b.end,confidence:.68,meta:{entidadTipo:e.type,entidadMeta:e.meta}}));}
+  for(const [aspect,type,rx] of ASPECTS){if(!rx.test(b.text))continue;const key=`${e.type}|${e.name.toLowerCase()}|${aspect}|${b.start}`;if(seen.has(key))continue;seen.add(key);const conf=(aspect==='definicion'||aspect==='que_es')?.9:.78;out.push(make({neuronId,type,entity:e.name,aspect,data:b.text,pagina,documento,start:b.start,end:b.end,confidence:conf,rel:relation(e.name,b.text),meta:{entidadTipo:e.type,entidadMeta:e.meta,aspectoDisparador:rx.source}}));}
+  if(['PROPIEDAD','MATERIAL','COMPONENTE'].includes(e.type)&&/\b(?:se define|definid[oa] como|defined as|is defined as|refers to|se refiere a|means|significa|consists of|consiste en|es un|es una|is a|is an)\b/i.test(b.text)){const key=`${e.type}|${e.name.toLowerCase()}|definicion_completa|${b.start}`;if(!seen.has(key)){seen.add(key);out.push(make({neuronId,type:'DEFINICION',entity:e.name,aspect:'definicion_completa',data:b.text,pagina,documento,start:b.start,end:b.end,confidence:.98,rel:relation(e.name,b.text),meta:{entidadTipo:e.type,definicionCompleta:true,noResumida:true}}));}}
+ }
+ for(const b of blocks(texto)){if(b.text.length<120)continue;if(!/(?:defin|property|propiedad|material|component|componente|method|m[eé]todo|measurement|medici[oó]n|application|aplicaci[oó]n|composition|composici[oó]n|behavior|comportamiento|condition|condici[oó]n|instrument|instrumento|standard|norma|formula|fórmula|relationship|relaci[oó]n|effect|efecto)/i.test(b.text))continue;const key=`UNANCHORED|${b.start}|${b.end}`;if(seen.has(key))continue;seen.add(key);const lang=idioma(b.text);out.push({neuronId,tipo:'EVIDENCIA',campo:'bloque_tecnico_no_anclado',textoOriginal:b.text,textoNormalizado:b.text.toLowerCase(),contexto:b.text,idioma:lang,confianza:.45,evidencia:{documento,pagina,fragmento:b.text,idioma:lang,tipoDocumento:'desconocido',posicionInicio:b.start,posicionFin:b.end},metadatos:{extractor:'extractorDocumentalExhaustivoNDV2',requiereAnclajePosterior:true}});}
+ return out;}
