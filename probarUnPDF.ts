@@ -56,7 +56,9 @@ async function main() {
     return;
   }
 
-  const neuronId = `ND_TEST_${numeroCarpeta}`;
+  // Usa el ID real de la ND para que el piloto y la corrida productiva
+  // compartan la misma identidad y la clave de idempotencia.
+  const neuronId = `ND-${numeroCarpeta.padStart(2, '0')}`;
   console.log(`\n🧠 ND PILOTO: "${elegido.nombre}"`);
   console.log(`   Drive ID: ${elegido.id}`);
   console.log('   Persistencia: Turso por página');
