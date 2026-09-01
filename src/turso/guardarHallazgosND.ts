@@ -60,9 +60,13 @@ async function prepararTabla(): Promise<void> {
   preparada = true;
 }
 
+function valorTextoSeguro(valor: unknown): string | null {
+  return typeof valor === 'string' ? valor : null;
+}
+
 function claveUnica(h: HallazgoND): string {
   const e = h.evidencia;
-  const driveId = String(h.metadatos?.documentoDriveId || e.documento);
+  const driveId = valorTextoSeguro(h.metadatos?.documentoDriveId) || e.documento;
   return [
     h.neuronId,
     driveId,
@@ -82,6 +86,7 @@ export async function guardarHallazgosND(hallazgos: HallazgoND[]): Promise<void>
   for (const h of hallazgos) {
     const e = h.evidencia;
     const clave = claveUnica(h);
+    const documentoDriveId = valorTextoSeguro(h.metadatos?.documentoDriveId);
     await turso.execute({
       sql: `INSERT OR IGNORE INTO nd_hallazgos_raw
         (neuron_id, tipo, campo, texto_original, texto_normalizado,
@@ -105,7 +110,7 @@ export async function guardarHallazgosND(hallazgos: HallazgoND[]): Promise<void>
         h.confianza,
         JSON.stringify(h.evidencia),
         h.metadatos ? JSON.stringify(h.metadatos) : null,
-        h.metadatos?.documentoDriveId || null,
+        documentoDriveId,
         e.pagina,
         e.posicionInicio ?? null,
         e.posicionFin ?? null,
