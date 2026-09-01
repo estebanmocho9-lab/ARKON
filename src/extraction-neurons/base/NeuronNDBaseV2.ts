@@ -27,7 +27,7 @@ export abstract class NeuronNDBaseV2{
 
  async ejecutar(limiteDocumentos?:number,limitePaginas?:number):Promise<void>{
   console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
-  if(limitePaginas)console.log(`   🧪 Límite de prueba: ${limitePaginas} páginas por documento`);
+  if(limitePaginas)console.log(`   🧪 Prueba limitada a ${limitePaginas} páginas por documento`);
   const checkpoint=this.cargarCheckpoint();
   const carpetaId=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
   const archivos=await listarPDFs(carpetaId);
@@ -50,19 +50,40 @@ export abstract class NeuronNDBaseV2{
     await registrarDocumentoND({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta});
     let totalPaginas=0,totalGuardados=0,paginasCorrida=0,totalTexto=0,ultimaPagina=paginaInicial-1;
     totalPaginas=await procesarPaginasIncremental(buffer,async({pagina,texto},total)=>{
-     totalPaginas=total;if(pagina===paginaInicial)await actualizarPaginasTotalND(archivo.id,total);
+     // Defensa adicional: aunque el parser cambie, una prueba nunca procesa
+     // ni persiste más páginas que el límite solicitado.
+     if(limitePaginas&&paginasCorrida>=limitePaginas)return;
+     totalPaginas=total;
+     if(pagina===paginaInicial)await actualizarPaginasTotalND(archivo.id,total);
      if(!limitePaginas&&await this.paginaYaProcesada(archivo.id,pagina))return;
      paginasCorrida++;ultimaPagina=pagina;totalTexto+=texto.trim().length;
      let hallazgos:ReturnType<typeof extraerNDCompleto>=[];
-     if(texto&&texto.trim().length>=20){const capitulo=detectarCapitulo(texto);hallazgos=extraerNDCompleto(texto,pagina,archivo.nombre,this.neuronId);for(const h of hallazgos){h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,...(capitulo?{capitulo}:{})};if(capitulo)h.evidencia.seccion=capitulo}}
+     if(texto&&texto.trim().length>=20){
+      const capitulo=detectarCapitulo(texto);
+      hallazgos=extraerNDCompleto(texto,pagina,archivo.nombre,this.neuronId);
+      for(const h of hallazgos){
+       h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,...(capitulo?{capitulo}:{})};
+       if(capitulo)h.evidencia.seccion=capitulo;
+      }
+     }
      const guardados=await guardarPaginaND(hallazgos,archivo.id,pagina);totalGuardados+=guardados;
      checkpoint.documentoEnProgreso={driveFileId:archivo.id,ultimaPaginaCompletada:pagina};this.guardarCheckpoint(checkpoint);
-     console.log(`      📄 ${pagina}/${total} → ${guardados}`);
+     if(limitePaginas || guardados>0)console.log(`      📄 ${pagina}/${total} → ${guardados}`);
+     else if(pagina%25===0)console.log(`      📄 ${pagina}/${total}`);
     },paginaInicial,limitePaginas);
+
     const completo=ultimaPagina>=totalPaginas;
-    if(completo){await finalizarDocumentoND(archivo.id);checkpoint.documentosCompletos=checkpoint.documentosCompletos.filter(id=>id!==archivo.id);checkpoint.documentosCompletos.push(archivo.id);delete checkpoint.documentoEnProgreso;this.guardarCheckpoint(checkpoint);procesados++;console.log(`      ✅ ${totalGuardados} hallazgos nuevos en Turso (${totalPaginas} páginas)`)}
-    else{this.guardarCheckpoint(checkpoint);procesados++;console.log(`      🧪 Prueba parcial: ${totalGuardados} hallazgos, ${paginasCorrida} páginas, texto=${totalTexto} caracteres. Última=${ultimaPagina}.`)}
-   }catch(err:any){console.error(`      ❌ Procesamiento interrumpido: ${err.message}`);console.log(`      ↩️  Reanudar desde la última página persistida.`)}finally{buffer=Buffer.alloc(0)}
+    if(completo){
+     await finalizarDocumentoND(archivo.id);
+     checkpoint.documentosCompletos=checkpoint.documentosCompletos.filter(id=>id!==archivo.id);checkpoint.documentosCompletos.push(archivo.id);delete checkpoint.documentoEnProgreso;this.guardarCheckpoint(checkpoint);
+     procesados++;
+     console.log(`      ✅ ${totalGuardados} hallazgos nuevos en Turso (${paginasCorrida} páginas procesadas)`);
+    }else{
+     this.guardarCheckpoint(checkpoint);
+     procesados++;
+     console.log(`      🧪 Prueba parcial: ${totalGuardados} hallazgos, ${paginasCorrida}/${totalPaginas} páginas, texto=${totalTexto} caracteres. Última=${ultimaPagina}.`);
+    }
+   }catch(err:any){console.error(`      ❌ Procesamiento interrumpido: ${err.message}`);console.log(`      ↩️ Reanudar desde la última página persistida.`)}finally{buffer=Buffer.alloc(0)}
   }
   console.log(`\n🏁 ${this.neuronId}: ${procesados} documentos procesados en esta corrida.`);console.log('   💾 ND → Turso únicamente. NE y Supabase no participan.');
  }
