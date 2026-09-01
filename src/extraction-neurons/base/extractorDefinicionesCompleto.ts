@@ -1,6 +1,5 @@
-// Definiciones ND estrictamente ancladas a la misma oración que la entidad,
-// pero conservando también contexto documental alrededor.
-// ND prioriza conservar información: la consolidación posterior decidirá qué sirve.
+// Definiciones ND ancladas a una entidad, conservando contexto documental muy amplio.
+// ND prioriza conservar informacion: la consolidacion posterior decidira que sirve.
 import { PROPIEDADES } from '../diccionarios/propiedades';
 import { PATRONES_DEFINICION_COMPLETA_ND } from '../diccionarios/patronesDefinicionCompletaND';
 import { HallazgoDefinicion } from './extractorDefiniciones';
@@ -20,19 +19,18 @@ function oraciones(texto:string): Array<{texto:string;inicio:number}> {
  return out;
 }
 
-/** Conserva hasta 2 oraciones antes y 2 después del disparador, hasta 2600 caracteres. */
-function contextoAmplio(sents:Array<{texto:string;inicio:number}>,indice:number,maxCaracteres=2600):string {
- const inicio=Math.max(0,indice-2),fin=Math.min(sents.length-1,indice+2);
+// Ventana deliberadamente grande: hasta 10 oraciones antes y 10 despues,
+// con tope de 12000 caracteres. Esto evita guardar una definicion aislada.
+function contextoAmplio(sents:Array<{texto:string;inicio:number}>,indice:number,maxCaracteres=12000):string {
+ const inicio=Math.max(0,indice-10),fin=Math.min(sents.length-1,indice+10);
  const bloque=normalizar(sents.slice(inicio,fin+1).map(x=>x.texto).join(' '));
  if(bloque.length<=maxCaracteres)return bloque;
- const objetivo=sents[indice].texto;
- if(objetivo.length>=maxCaracteres)return normalizar(objetivo.slice(0,maxCaracteres));
- let out=objetivo;
- for(let d=1;d<=2;d++){
+ let out=sents[indice].texto;
+ for(let d=1;d<=10;d++){
   const izq=indice-d>=0?sents[indice-d].texto:'';
   const der=indice+d<sents.length?sents[indice+d].texto:'';
-  if(izq && out.length+izq.length+1<=maxCaracteres)out=izq+' '+out;
-  if(der && out.length+der.length+1<=maxCaracteres)out=out+' '+der;
+  if(izq&&out.length+izq.length+1<=maxCaracteres)out=izq+' '+out;
+  if(der&&out.length+der.length+1<=maxCaracteres)out=out+' '+der;
  }
  return normalizar(out.slice(0,maxCaracteres));
 }
@@ -53,10 +51,7 @@ export function extraerDefinicionesPropiedadesCompleto(texto:string): HallazgoDe
      const flags=patron.regex.flags.replace(/g/g,'');
      const rePatron=new RegExp(patron.regex.source,flags);
      if(!rePatron.test(s.texto)) continue;
-
-     // El patrón solo dispara la captura. La evidencia almacenada incluye
-     // contexto anterior y posterior para evitar definiciones inconclusas.
-     const contenido=normalizar(contextoAmplio(sents,i,2600));
+     const contenido=normalizar(contextoAmplio(sents,i,12000));
      if(contenido.length<40) continue;
      const clave=`${propiedad.id}|${patron.campo}|${s.inicio}|${contenido}`;
      if(vistos.has(clave)) continue;
