@@ -11,6 +11,7 @@
     "sync": "tsc && node dist/sheets/syncData.js",
     "worker": "tsc && node dist/worker/workerTrabajos.js",
     "check": "tsc --noEmit",
+    "verificar:turso": "ts-node --transpile-only verificarTurso.ts",
     "extraer:01": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 01",
     "extraer:02": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 02",
     "extraer:03": "ts-node --transpile-only src/extraction-neurons/runExtraccion.ts 03",
