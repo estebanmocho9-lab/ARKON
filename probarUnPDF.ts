@@ -3,7 +3,14 @@
 // Prueba el motor ND sobre UN SOLO PDF, mostrando por pantalla
 // evidencia documental amplia. NO guarda nada en Turso/Supabase
 // ni toca checkpoints.
+//
+// Uso:
+//   npx ts-node --transpile-only probarUnPDF.ts 01
+//   npx ts-node --transpile-only probarUnPDF.ts 01 "vermiculite"
 // ============================================================
+
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from './src/extraction-neurons/drive/driveReader';
 import { extraerPaginas } from './src/extraction-neurons/pdf/pdfParser';
@@ -27,7 +34,11 @@ async function main() {
   const numeroCarpeta = process.argv[2] || '01';
   const filtroNombre = process.argv[3]?.toLowerCase();
   const configurada = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
-  if (!configurada) throw new Error('Falta CARPETA_MADRE_DRIVE_ID en el .env');
+  if (!configurada) {
+    throw new Error(
+      'Falta CARPETA_MADRE_DRIVE_ID. Cargá el ID en .env o exportalo en la sesión.'
+    );
+  }
 
   const carpetaId = await resolverSubcarpetaPorNombre(extraerIdCarpeta(configurada), numeroCarpeta);
   const archivos = await listarPDFs(carpetaId);
