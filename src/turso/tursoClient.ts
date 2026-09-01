@@ -1,25 +1,18 @@
-import { createClient } from '@libsql/client';
+import { createClient, Client } from '@libsql/client';
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 
-let turso: any;
-try {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+const url = process.env.TURSO_DATABASE_URL?.trim();
+const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
 
-  if (!url || !authToken) {
-    throw new Error('Faltan TURSO_DATABASE_URL o TURSO_AUTH_TOKEN en el archivo .env');
-  }
-
-  turso = createClient({
-    url,
-    authToken,
-  });
-} catch {
-  console.warn('[AI Studio] Turso not configured — using mock client');
-  turso = {
-    execute: async () => ({ rows: [] })
-  };
+if (!url || !authToken) {
+  throw new Error(
+    'Turso no está configurado: faltan TURSO_DATABASE_URL y/o TURSO_AUTH_TOKEN en .env.'
+  );
 }
 
-export { turso };
+export const turso: Client = createClient({
+  url,
+  authToken,
+});
