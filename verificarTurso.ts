@@ -1,11 +1,15 @@
 // ============================================================
 // verificarTurso.ts
-// Verifica conexión con Turso y los dos destinos principales de
-// extracción: propiedades cuantitativas y evidencia documental ND.
-// No inserta, modifica ni borra datos.
+// Verifica conexión con Turso y garantiza los dos destinos
+// principales de extracción: propiedades cuantitativas y
+// evidencia documental ND.
+// No inserta datos de documentos ni borra registros.
+// Si falta una tabla de infraestructura, la crea de forma
+// idempotente para dejar Turso listo para la extracción.
 // ============================================================
 
 import { turso } from './src/turso/tursoClient';
+import { prepararTablaND } from './src/turso/guardarHallazgosND';
 
 const COLUMNAS_ESPERADAS_PROPIEDADES = [
   'neurona_id', 'documento', 'drive_file_id', 'pagina', 'capitulo',
@@ -55,9 +59,10 @@ async function main() {
     console.log('✅ Esquema propiedades_extraidas compatible con la NE.');
   }
 
-  // La tabla ND se crea de forma idempotente por guardarHallazgosND().
-  // Verificarla aquí permite detectar si el tramo documental está
-  // realmente conectado a Turso antes de iniciar una corrida masiva.
+  // Infraestructura ND: si no existe, se crea ahora de forma idempotente.
+  // No se insertan hallazgos ni se borran datos.
+  console.log('🧾 Preparando tabla documental nd_hallazgos_raw...');
+  await prepararTablaND();
   const nd = await verificarTabla('nd_hallazgos_raw', COLUMNAS_ESPERADAS_ND);
   console.log('✅ Tabla nd_hallazgos_raw: OK');
   console.log(`📊 nd_hallazgos_raw: ${nd.total} registros`);
@@ -69,7 +74,7 @@ async function main() {
     console.log('✅ Esquema nd_hallazgos_raw compatible con ND.');
   }
 
-  if (!process.exitCode) console.log('🏁 Verificación terminada: no se modificó ningún dato.');
+  if (!process.exitCode) console.log('🏁 Verificación terminada: Turso quedó listo; no se modificaron datos de documentos.');
 }
 
 main().catch(err => {
