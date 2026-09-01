@@ -15,6 +15,7 @@ import {
   guardarPaginaND,
   finalizarDocumentoND,
 } from '../../turso/guardarHallazgosND';
+import { turso } from '../../turso/tursoClient';
 
 const CARPETA_CHECKPOINTS = path.join(process.cwd(), 'checkpoints');
 interface CheckpointND {
@@ -45,6 +46,14 @@ export abstract class NeuronNDBase {
 
   private guardarCheckpoint(cp: CheckpointND): void {
     fs.writeFileSync(this.rutaCheckpoint(), JSON.stringify(cp, null, 2), 'utf8');
+  }
+
+  private async paginaYaProcesada(documentoDriveId: string, pagina: number): Promise<boolean> {
+    const r = await turso.execute({
+      sql: `SELECT estado FROM nd_paginas WHERE documento_drive_id=? AND pagina=?`,
+      args: [documentoDriveId, pagina],
+    });
+    return r.rows[0]?.estado === 'procesada';
   }
 
   async ejecutar(limiteDocumentos?: number): Promise<void> {
@@ -80,56 +89,62 @@ export abstract class NeuronNDBase {
           carpetaDrive: this.numeroCarpeta,
         });
 
-        let ultimaPagina = paginaInicial - 1;
         let totalPaginas = 0;
         let totalGuardados = 0;
 
         totalPaginas = await procesarPaginasIncremental(buffer, async ({ pagina, texto }, total) => {
           totalPaginas = total;
-          if (!texto || texto.trim().length < 20) {
-            checkpoint.documentoEnProgreso = { driveFileId: archivo.id, ultimaPaginaCompletada: pagina };
-            this.guardarCheckpoint(checkpoint);
-            return;
+
+          // Turso es la fuente de verdad para la reanudación: si la página
+          // ya fue persistida, no volvemos a extraerla.
+          if (await this.paginaYaProcesada(archivo.id, pagina)) return;
+
+          let hallazgos: ReturnType<typeof extraerNDCompleto> = [];
+          if (texto && texto.trim().length >= 20) {
+            const capitulo = detectarCapitulo(texto);
+            hallazgos = extraerNDCompleto(texto, pagina, archivo.nombre, this.neuronId);
+            for (const h of hallazgos) {
+              h.metadatos = {
+                ...(h.metadatos || {}),
+                documentoDriveId: archivo.id,
+                carpetaDrive: this.numeroCarpeta,
+                ...(capitulo ? { capitulo } : {}),
+              };
+              if (capitulo) h.evidencia.seccion = capitulo;
+            }
           }
 
-          const capitulo = detectarCapitulo(texto);
-          const hallazgos = extraerNDCompleto(texto, pagina, archivo.nombre, this.neuronId);
-          for (const h of hallazgos) {
-            h.metadatos = {
-              ...(h.metadatos || {}),
-              documentoDriveId: archivo.id,
-              carpetaDrive: this.numeroCarpeta,
-              ...(capitulo ? { capitulo } : {}),
-            };
-            if (capitulo) h.evidencia.seccion = capitulo;
-          }
-
+          // INCLUSO una página sin texto útil se registra como procesada.
+          // Así el checkpoint lógico y Turso nunca quedan desalineados.
           const guardados = await guardarPaginaND(hallazgos, archivo.id, pagina);
           totalGuardados += guardados;
-          ultimaPagina = pagina;
 
           checkpoint.documentoEnProgreso = { driveFileId: archivo.id, ultimaPaginaCompletada: pagina };
           this.guardarCheckpoint(checkpoint);
 
-          console.log(`      📄 ${pagina}/${total} → ${guardados} hallazgos guardados`);
+          // Una sola línea compacta por página; nunca imprimimos hallazgos.
+          console.log(`      📄 ${pagina}/${total} → ${guardados}`);
         }, paginaInicial);
 
+        // El documento queda completo solamente después de persistir todas
+        // las páginas. Si el proceso muere antes, puede reanudarse.
         await finalizarDocumentoND(archivo.id);
         checkpoint.documentosCompletos.push(archivo.id);
         delete checkpoint.documentoEnProgreso;
         this.guardarCheckpoint(checkpoint);
         procesados++;
 
-        console.log(`      ✅ ${totalGuardados} hallazgos persistidos en Turso (${totalPaginas} páginas)`);
+        console.log(`      ✅ ${totalGuardados} hallazgos nuevos en Turso (${totalPaginas} páginas)`);
       } catch (err: any) {
         console.error(`      ❌ Procesamiento interrumpido: ${err.message}`);
-        console.log(`      ↩️  El checkpoint permite reanudar desde la última página guardada.`);
+        console.log(`      ↩️  Reanudar: la última página persistida queda registrada en Turso/checkpoint.`);
       } finally {
+        // Liberar explícitamente la referencia al Buffer antes del siguiente PDF.
         buffer = Buffer.alloc(0);
       }
     }
 
     console.log(`\n🏁 ${this.neuronId}: ${procesados} documentos procesados en esta corrida.`);
-    console.log('   💾 Los hallazgos quedan en Turso; ND no mantiene una RAM documental acumulativa.');
+    console.log('   💾 ND → Turso únicamente. NE y Supabase no participan.');
   }
 }
