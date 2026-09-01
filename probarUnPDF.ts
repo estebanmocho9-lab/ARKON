@@ -1,141 +1,89 @@
 // ============================================================
 // probarUnPDF.ts
-// Prueba el motor de extracción actualizado sobre UN SOLO PDF,
-// mostrando por pantalla lo que encuentra. NO guarda nada en
-// Turso ni en Supabase, NO toca ningún checkpoint — es de solo
-// lectura, pensado para verificar la extracción antes de
-// reprocesar carpetas enteras.
-//
-// Uso:
-//   npx ts-node --transpile-only probarUnPDF.ts 01
-//   npx ts-node --transpile-only probarUnPDF.ts 01 "cemento"
-//
-// El primer argumento es el número de carpeta (01, 02, ...).
-// El segundo (opcional) es un pedazo del nombre del archivo, para
-// elegir cuál PDF probar; si no lo pasás, usa el primero legible
-// que encuentre.
-//
-// La carpeta 01 se resuelve DENTRO de CARPETA_MADRE_DRIVE_ID.
-// Esa variable ya forma parte de la configuración de ARKON.
+// Prueba el motor ND sobre UN SOLO PDF, mostrando por pantalla
+// evidencia documental amplia. NO guarda nada en Turso/Supabase
+// ni toca checkpoints.
 // ============================================================
 
-import {
-  resolverSubcarpetaPorNombre,
-  listarPDFs,
-  descargarArchivo,
-} from './src/extraction-neurons/drive/driveReader';
+import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from './src/extraction-neurons/drive/driveReader';
 import { extraerPaginas } from './src/extraction-neurons/pdf/pdfParser';
-import { cargarDiccionarioMateriales, cargarDiccionarioComponentes } from './src/extraction-neurons/diccionarios/materiales';
-import { analizarPagina } from './src/extraction-neurons/base/motorExtraccion';
-import { extraerEstadoNatural } from './src/extraction-neurons/base/extractorESP001';
+import { extraerNDCompleto } from './src/extraction-neurons/base/extractorNDCompleto';
+import { HallazgoND } from './src/extraction-neurons/memoria-nd/tipos';
 
-const PALABRAS_ESTADOS_NUEVOS = ['absorción', 'absorcion', 'higroscóp', 'higroscop', 'expansi', 'hincham', 'contracc', 'retracc'];
+function contar(hallazgos: HallazgoND[], tipo: HallazgoND['tipo']): number {
+  return hallazgos.filter(h => h.tipo === tipo).length;
+}
+
+function imprimirEjemplos(hallazgos: HallazgoND[], tipo: HallazgoND['tipo'], limite = 8): void {
+  const lista = hallazgos.filter(h => h.tipo === tipo).slice(0, limite);
+  if (!lista.length) { console.log('  (ninguno)'); return; }
+  for (const h of lista) {
+    const campo = h.campo ? ` [${h.campo}]` : '';
+    console.log(`  pág.${h.evidencia.pagina}${campo}: ${h.textoOriginal.slice(0, 500)}`);
+  }
+}
 
 async function main() {
   const numeroCarpeta = process.argv[2] || '01';
   const filtroNombre = process.argv[3]?.toLowerCase();
-  const carpetaMadreId = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
+  const configurada = process.env.CARPETA_MADRE_DRIVE_ID?.trim();
+  if (!configurada) throw new Error('Falta CARPETA_MADRE_DRIVE_ID en el .env');
 
-  if (!carpetaMadreId) {
-    throw new Error(
-      'Falta CARPETA_MADRE_DRIVE_ID en el entorno. ' +
-      'No se puede resolver la carpeta de la neurona sin la carpeta madre de Google Drive.'
-    );
-  }
-
-  console.log(`📂 Buscando carpeta ${numeroCarpeta} dentro de la carpeta madre configurada...`);
-  const carpetaId = await resolverSubcarpetaPorNombre(carpetaMadreId, numeroCarpeta);
+  const carpetaId = await resolverSubcarpetaPorNombre(extraerIdCarpeta(configurada), numeroCarpeta);
   const archivos = await listarPDFs(carpetaId);
-
-  const candidatos = filtroNombre
-    ? archivos.filter((a) => a.nombre.toLowerCase().includes(filtroNombre))
-    : archivos;
-
+  const candidatos = filtroNombre ? archivos.filter(a => a.nombre.toLowerCase().includes(filtroNombre)) : archivos;
   const elegido = candidatos[0];
 
   if (!elegido) {
     console.error('❌ No encontré ningún PDF que coincida.');
-    if (filtroNombre) {
-      console.log(`   Filtro utilizado: "${filtroNombre}"`);
-    }
+    if (filtroNombre) console.log(`   Filtro utilizado: "${filtroNombre}"`);
+    console.log(`   PDFs disponibles: ${archivos.length}`);
+    for (const a of archivos.slice(0, 10)) console.log(`      - ${a.nombre}`);
     return;
   }
 
-  console.log(`📖 Probando con: "${elegido.nombre}"\n`);
-
+  console.log(`📖 Probando ND con: "${elegido.nombre}"`);
   const buffer = await descargarArchivo(elegido.id);
-  let paginas;
-  try {
-    paginas = await extraerPaginas(buffer);
-  } catch (err: any) {
-    console.error(`❌ No se pudo extraer texto de este PDF: ${err.message}`);
-    console.log('   Probá con otro archivo: npx ts-node --transpile-only probarUnPDF.ts', numeroCarpeta, '"<pedazo del nombre>"');
-    return;
+  const paginas = await extraerPaginas(buffer);
+  console.log(`✅ ${paginas.length} páginas de texto extraídas.`);
+
+  const hallazgos: HallazgoND[] = [];
+  for (const { pagina, texto } of paginas) {
+    if (!texto || texto.trim().length < 20) continue;
+    hallazgos.push(...extraerNDCompleto(texto, pagina, elegido.nombre, `ND_TEST_${numeroCarpeta}`));
   }
 
-  console.log(`✅ ${paginas.length} páginas de texto extraídas. Cargando diccionarios...\n`);
-  const materiales = await cargarDiccionarioMateriales();
-  const componentes = await cargarDiccionarioComponentes();
+  console.log('\n════════════════════════════════════════════════════════════');
+  console.log('📊 RESULTADO — ND EXTRACCIÓN DOCUMENTAL');
+  console.log('════════════════════════════════════════════════════════════');
+  console.log(`Documento: ${elegido.nombre}`);
+  console.log(`Páginas:   ${paginas.length}`);
+  console.log(`Hallazgos: ${hallazgos.length}\n`);
+  console.log(`DEFINICIONES:     ${contar(hallazgos, 'DEFINICION')}`);
+  console.log(`MATERIALES:       ${contar(hallazgos, 'MATERIAL')}`);
+  console.log(`COMPONENTES:      ${contar(hallazgos, 'COMPONENTE')}`);
+  console.log(`PROPIEDADES:      ${contar(hallazgos, 'PROPIEDAD')} (menciones, sin interpretar valores)`);
+  console.log(`ATRIBUTOS:        ${contar(hallazgos, 'ATRIBUTO')}`);
+  console.log(`RELACIONES:       ${contar(hallazgos, 'RELACION')}`);
+  console.log(`CONDICIONES:      ${contar(hallazgos, 'CONDICION')}`);
+  console.log(`MÉTODOS:          ${contar(hallazgos, 'METODO')}`);
+  console.log(`INSTRUMENTOS:     ${contar(hallazgos, 'INSTRUMENTO')}`);
+  console.log(`APLICACIONES:     ${contar(hallazgos, 'APLICACION')}`);
+  console.log(`COMPORTAMIENTO:   ${contar(hallazgos, 'COMPORTAMIENTO')}`);
+  console.log(`NORMAS:           ${contar(hallazgos, 'NORMA')}`);
+  console.log(`EVIDENCIA:        ${contar(hallazgos, 'EVIDENCIA')}`);
+  console.log(`SIN CLASIFICAR:   ${contar(hallazgos, 'DESCONOCIDO')}`);
 
-  let totalRegistros = 0;
-  let componentesEncontrados: { pagina: number; material: string | null; componente: string; catalogado: boolean }[] = [];
-  let estadosNuevosEncontrados: { pagina: number; condicion: string }[] = [];
-  let estadoNaturalEncontrado: { pagina: number; material: string; estado: string }[] = [];
-  const nombresComponentesCatalogados = new Set(componentes.map((c) => c.nombre_es.toLowerCase()));
-
-  const PAGINAS_A_PROBAR = Math.min(paginas.length, 30); // no hace falta el libro entero para la prueba
-
-  for (let i = 0; i < PAGINAS_A_PROBAR; i++) {
-    const { pagina, texto } = paginas[i];
-    const { registros } = analizarPagina(texto, materiales, componentes);
-    totalRegistros += registros.length;
-
-    for (const r of registros) {
-      if (r.componente) {
-        componentesEncontrados.push({
-          pagina,
-          material: r.material,
-          componente: r.componente,
-          catalogado: nombresComponentesCatalogados.has(r.componente.toLowerCase()),
-        });
-      }
-      if (r.condicion_ensayo && PALABRAS_ESTADOS_NUEVOS.some((p) => r.condicion_ensayo!.toLowerCase().includes(p))) {
-        estadosNuevosEncontrados.push({ pagina, condicion: r.condicion_ensayo });
-      }
-    }
-
-    const estadoNatural = extraerEstadoNatural(texto, materiales);
-    for (const en of estadoNatural) {
-      estadoNaturalEncontrado.push({ pagina, material: en.material, estado: en.estado_natural });
-    }
+  console.log('\n── EJEMPLOS DE FRAGMENTOS COMPLETOS ──');
+  for (const tipo of ['DEFINICION','RELACION','COMPORTAMIENTO','EVIDENCIA','METODO','APLICACION','NORMA'] as HallazgoND['tipo'][]) {
+    console.log(`\n[${tipo}]`);
+    imprimirEjemplos(hallazgos, tipo);
   }
 
-  console.log(`\n📊 RESULTADOS (primeras ${PAGINAS_A_PROBAR} páginas de ${paginas.length}):\n`);
-  console.log(`Total de propiedades encontradas: ${totalRegistros}\n`);
-
-  console.log(`── Componentes encontrados (${componentesEncontrados.length}) ──`);
-  if (componentesEncontrados.length === 0) console.log('  (ninguno en estas páginas)');
-  for (const c of componentesEncontrados.slice(0, 20)) {
-    console.log(`  pág.${c.pagina} | material: ${c.material || '(sin material)'} | componente: "${c.componente}" | ${c.catalogado ? 'ya en tu catálogo' : '🆕 NUEVO (detectado por patrón)'}`);
-  }
-
-  console.log(`\n── Estados nuevos (absorción/higroscópico/expansión/contracción) (${estadosNuevosEncontrados.length}) ──`);
-  if (estadosNuevosEncontrados.length === 0) console.log('  (ninguno en estas páginas)');
-  for (const e of estadosNuevosEncontrados.slice(0, 20)) {
-    console.log(`  pág.${e.pagina} | "${e.condicion}"`);
-  }
-
-  console.log(`\n── Estado natural detectado (${estadoNaturalEncontrado.length}) ──`);
-  if (estadoNaturalEncontrado.length === 0) console.log('  (ningún material de tu lista mencionado en estas páginas)');
-  const unicos = Array.from(new Map(estadoNaturalEncontrado.map((e) => [e.material, e])).values());
-  for (const e of unicos) {
-    console.log(`  ${e.material} → ${e.estado}`);
-  }
-
-  console.log('\n🏁 Prueba terminada. No se guardó nada en Turso ni en Supabase, no se tocó ningún checkpoint.');
+  console.log('\n🏁 Prueba terminada.');
+  console.log('   No se guardó nada en Turso ni Supabase.');
+  console.log('   No se tocó ningún checkpoint.');
+  console.log('   ND conserva evidencia documental; NE queda encargada de la extracción cuantitativa fina.');
 }
 
-main().catch((err) => {
-  console.error('Error general:', err);
-  process.exit(1);
-});
+main().catch(err => { console.error('Error general:', err); process.exit(1); });
