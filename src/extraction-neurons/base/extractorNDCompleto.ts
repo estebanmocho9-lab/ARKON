@@ -1,13 +1,14 @@
 // ============================================================
 // Composicion final del extractor ND.
-// Mantiene el extractor universal existente, reemplaza la capa
-// de definiciones por la version completa y suma metadatos.
-// ND sigue sin clasificar para las 100.
+// Mantiene el extractor universal, definiciones completas,
+// metadatos documentales y captura estructurada exhaustiva.
+// ND conserva evidencia; no escribe en Supabase ni en tablas NE.
 // ============================================================
 
 import { extraerDefinicionesPropiedadesCompleto } from './extractorDefinicionesCompleto';
 import { extraerNDUniversal } from './extractorNDUniversal';
 import { extraerMetadatosCientificosND } from './extractorMetadatosCientificosND';
+import { extraerDatosCientificosND } from './extractorDatosCientificosND';
 import { HallazgoND } from '../memoria-nd/tipos';
 
 export function extraerNDCompleto(
@@ -16,8 +17,6 @@ export function extraerNDCompleto(
   documento: string,
   neuronId: string,
 ): HallazgoND[] {
-  // La capa universal ya extrae todo lo transversal. Sus definiciones
-  // se reemplazan por la capa completa para evitar duplicados.
   const base = extraerNDUniversal(texto, pagina, documento, neuronId)
     .filter(h => h.tipo !== 'DEFINICION');
 
@@ -46,7 +45,9 @@ export function extraerNDCompleto(
   });
 
   const metadatos = extraerMetadatosCientificosND(texto, pagina, documento, neuronId);
-  return deduplicar([...base, ...definiciones, ...metadatos]);
+  const datos = extraerDatosCientificosND(texto, pagina, documento, neuronId);
+
+  return deduplicar([...base, ...definiciones, ...metadatos, ...datos]);
 }
 
 function deduplicar(hallazgos: HallazgoND[]): HallazgoND[] {
