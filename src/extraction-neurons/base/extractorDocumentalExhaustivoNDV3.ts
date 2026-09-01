@@ -12,31 +12,17 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const INVALIDA = /^entidad\s+no\s+determinada$/i;
 const UNITS = String.raw`(?:%|ppm|ppb|°C|ºC|K|MPa|GPa|kPa|Pa|N|kN|kg|g|mg|µg|um|μm|mm|cm|m|m²|m2|m3|m³|kg/m3|kg/m³|g/cm3|g/cm³|W/mK|W/m·K|W/(m·K)|J/g|J/kg|kJ/kg|MJ/kg|Hz|s|min|h|d|mol|mol/L|M|V|A|Ω|Ohm|mS/cm|S/m)`;
 const NUM = String.raw`[-+]?\d+(?:[.,]\d+)?(?:\s*[×x*]\s*10\s*[-+]?\d+)?`;
-
 const MATERIAL_TERMS = [
-  'cemento Portland','pasta de cemento','cemento','yeso','gypsum','hormigón','hormigon','concreto','concrete',
-  'mortero','mortar','arena','sand','arcilla','clay','vidrio','glass','fibra de vidrio','glass fiber',
-  'acero','steel','aluminio','aluminum','cobre','copper','hierro','iron','madera','wood','plástico','plastico','plastic',
-  'resina','resin','polímero','polimero','polymer','epoxi','epoxy','cerámica','ceramica','ceramic','ladrillo','brick',
-  'árido','arido','agregado','aggregate','composite','compuesto','óxido de aluminio','oxido de aluminio',
-  'óxido de calcio','oxido de calcio','óxido de hierro','oxido de hierro','óxido de silicio','oxido de silicio',
-  'óxido de sodio','oxido de sodio','óxido de magnesio','oxido de magnesio','alúmina','alumina','sílice','silica'
+  'cemento Portland','pasta de cemento','cemento','yeso','gypsum','hormigón','hormigon','concreto','concrete','mortero','mortar','arena','sand','arcilla','clay','vidrio','glass','fibra de vidrio','glass fiber','acero','steel','aluminio','aluminum','cobre','copper','hierro','iron','madera','wood','plástico','plastico','plastic','resina','resin','polímero','polimero','polymer','epoxi','epoxy','cerámica','ceramica','ceramic','ladrillo','brick','árido','arido','agregado','aggregate','composite','compuesto','óxido de aluminio','oxido de aluminio','óxido de calcio','oxido de calcio','óxido de hierro','oxido de hierro','óxido de silicio','oxido de silicio','óxido de sodio','oxido de sodio','óxido de magnesio','oxido de magnesio','alúmina','alumina','sílice','silica'
 ];
 const MATERIAL_SET = new Set(MATERIAL_TERMS.map(x => x.toLowerCase()));
 const MAGNITUDE_TERMS = [
-  'temperatura','temperature','presión','presion','pressure','humedad','humidity','concentración','concentracion','concentration',
-  'tiempo','time','edad','age','masa','mass','volumen','volume','longitud','length','altura','height','espesor','thickness',
-  'diámetro','diametro','diameter','área','area','area superficial','superficie específica','superficie especifica',
-  'densidad','density','porcentaje','percentage','proporción','proporcion','proportion','velocidad','velocity','speed',
-  'frecuencia','frequency','energía','energia','energy','potencia','power','caudal','flow rate','tensión','tension',
-  'stress','deformación','deformacion','strain','fuerza','force','resistencia','strength','módulo','modulo','modulus'
+  'temperatura','temperature','presión','presion','pressure','humedad','humidity','concentración','concentracion','concentration','tiempo','time','edad','age','masa','mass','volumen','volume','longitud','length','altura','height','espesor','thickness','diámetro','diametro','diameter','área','area','area superficial','superficie específica','superficie especifica','densidad','density','porcentaje','percentage','proporción','proporcion','proportion','velocidad','velocity','speed','frecuencia','frequency','energía','energia','energy','potencia','power','caudal','flow rate','tensión','tension','stress','deformación','deformacion','strain','fuerza','force','resistencia','strength','módulo','modulo','modulus'
 ];
-
 const NORMA = /\b(?:ASTM|ISO|IRAM|EN|UNE|AASHTO|DIN|BS|JIS|IEC|NF|CSA|GB|ABNT)\s*[- ]?\s*[A-Z]?\s*\d{2,6}(?:[-:]\d{2,4})?(?:\s*[-:]?\s*[A-Z]\d{0,3})?\b/giu;
 const COMPONENTE = /\b(?:componente|component|constituyente|constituent|fase|phase|aditivo|additive|matriz|matrix|ligante|binder|relleno|filler)\s*(?::|=|denominado\s+|llamado\s+|called\s+|named\s+)?\s*([^,.;:\n]{2,90})/giu;
 const METODO = /\b(?:método|metodo|method|procedimiento|procedure|ensayo|test|técnica|tecnica|technique|protocolo|protocol)\s+(?:de\s+|del\s+|para\s+|the\s+|of\s+|for\s+)?([^,.;:\n]{2,100})/giu;
 const INSTRUMENTO = /\b(?:instrumento|instrument|equipo|equipment|aparato|apparatus|dispositivo|device|sensor|sonda|probe|microscopio|microscope|espectrómetro|espectrometro|spectrometer|balanza|balance|termómetro|termometro|thermometer|prensa|press|extensómetro|extensometro|extensometer)\s+(?:de\s+|para\s+|the\s+|for\s+)?([^,.;:\n]{2,100})/giu;
-
 const ASPECTS: Array<[string, Tipo, RegExp]> = [
   ['definicion','DEFINICION',/\b(?:se define como|se define|definid[oa] como|definition|defined as|is defined as|refers to|se refiere a|means|significa)\b/iu],
   ['que_es','DEFINICION',/\b(?:es un|es una|es el|es la|is a|is an|is the|consiste en|consists of|denota|denotes)\b/iu],
@@ -82,8 +68,8 @@ function sentenceData(block:Block,pos:number){const local=Math.max(0,Math.min(bl
 function bad(name:string){const s=canon(name);return INVALIDA.test(s)||s.length<3||s.length>100||/\b(?:que|porque|cuando|donde|which|that|because|when|where|and|y|en los|en las|in the|of the)\s*$/i.test(s)||/^(?:componente|component|fase|phase|método|metodo|method|procedimiento|procedure|instrumento|instrument|equipo|equipment|aparato|apparatus)$/i.test(s);}
 function addEntity(out:Entity[],type:Tipo,name:string,pos:number,meta?:Record<string,unknown>){const n=canon(name);if(!bad(n))out.push({type,name:n,pos,meta});}
 function entities(texto:string):Entity[]{
- const out:Entity[]=[];const materialRanges:Array<{start:number;end:number}>[] = [];
- for(const term of MATERIAL_TERMS){const r=new RegExp(`(?<![\\p{L}\\p{N}])${esc(term)}(?![\\p{L}\\p{N}])`,'giu');let m:RegExpExecArray|null;while((m=r.exec(texto))){materialRanges.push({start:m.index,end:m.index+m[0].length} as any);addEntity(out,'MATERIAL',m[0],m.index);}}
+ const out:Entity[]=[];const materialRanges:Array<{start:number;end:number}> = [];
+ for(const term of MATERIAL_TERMS){const r=new RegExp(`(?<![\\p{L}\\p{N}])${esc(term)}(?![\\p{L}\\p{N}])`,'giu');let m:RegExpExecArray|null;while((m=r.exec(texto))){materialRanges.push({start:m.index,end:m.index+m[0].length});addEntity(out,'MATERIAL',m[0],m.index);}}
  const overlapsMaterial=(start:number,end:number)=>materialRanges.some(x=>start<x.end&&end>x.start);
  const propertyNames=new Map<string,string>();for(const p of PROPIEDADES)for(const term of [p.nombre_es,p.nombre_en,...(p.sinonimos||[])])if(term&&term.trim().length>=3)propertyNames.set(norm(term).toLowerCase(),norm(term));
  for(const [key,term] of propertyNames){if(MATERIAL_SET.has(key))continue;const symbolic=/^(?:pH|E|G|K|R|T|P|V|I|A|C|d50|MOR|SSA|WA|Vp|dp|ρ|ρs|ρb|φ|τ)$/i.test(term);const flags=symbolic?'gu':'giu';const r=new RegExp(`(?<![\\p{L}\\p{N}])${esc(term)}(?![\\p{L}\\p{N}])`,flags);let m:RegExpExecArray|null;while((m=r.exec(texto))){if(overlapsMaterial(m.index,m.index+m[0].length))continue;if(symbolic&&/\bPh\.?\s*(?:D|d)?\.?/i.test(texto.slice(Math.max(0,m.index-2),Math.min(texto.length,m.index+8))))continue;addEntity(out,'PROPIEDAD',term,m.index,{diccionario:'propiedades',termino:m[0],simbolo:symbolic});}}
