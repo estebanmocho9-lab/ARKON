@@ -10,8 +10,11 @@ import { procesarPaginasIncremental, detectarCapitulo } from '../pdf/pdfParser';
 import { extraerNDCompleto } from './extractorNDCompleto';
 import { registrarDocumentoND, actualizarPaginasTotalND, guardarPaginaND, finalizarDocumentoND } from '../../turso/guardarHallazgosND';
 import { turso } from '../../turso/tursoClient';
+
 const CARPETA_CHECKPOINTS=path.join(process.cwd(),'checkpoints');
+const TABLAS_ND=['nd_datos_entidad','nd_entidades_documentales','nd_hallazgos_raw','nd_paginas','nd_materiales','nd_componentes','nd_propiedades','nd_magnitudes','nd_atributos','nd_relaciones','nd_condiciones','nd_metodos','nd_instrumentos','nd_aplicaciones','nd_comportamientos','nd_normas','nd_definiciones','nd_evidencias','nd_formulas','nd_documentos'];
 interface CheckpointND{documentosCompletos:string[];documentoEnProgreso?:{driveFileId:string;ultimaPaginaCompletada:number}}
+
 export abstract class NeuronNDBaseV2{
  abstract readonly neuronId:string;
  abstract readonly numeroCarpeta:string;
@@ -20,6 +23,8 @@ export abstract class NeuronNDBaseV2{
  private cargarCheckpoint():CheckpointND{const r=this.rutaCheckpoint();if(!fs.existsSync(r))return{documentosCompletos:[]};return JSON.parse(fs.readFileSync(r,'utf8'))}
  private guardarCheckpoint(cp:CheckpointND){fs.writeFileSync(this.rutaCheckpoint(),JSON.stringify(cp,null,2),'utf8')}
  private async paginaYaProcesada(documentoDriveId:string,pagina:number){const r=await turso.execute({sql:`SELECT estado FROM nd_paginas WHERE documento_drive_id=? AND pagina=?`,args:[documentoDriveId,pagina]});return r.rows[0]?.estado==='procesada'}
+ private async limpiarDocumentoParaPrueba(documentoDriveId:string){for(const tabla of TABLAS_ND)await turso.execute({sql:`DELETE FROM ${tabla} WHERE documento_drive_id=?`,args:[documentoDriveId]})}
+
  async ejecutar(limiteDocumentos?:number,limitePaginas?:number):Promise<void>{
   console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
   if(limitePaginas)console.log(`   🧪 Límite de prueba: ${limitePaginas} páginas por documento`);
@@ -27,14 +32,20 @@ export abstract class NeuronNDBaseV2{
   const carpetaId=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
   const archivos=await listarPDFs(carpetaId);
   console.log(`   📚 ${archivos.length} PDFs encontrados`);let procesados=0;
+
   for(const archivo of archivos){
    if(limiteDocumentos&&procesados>=limiteDocumentos)break;
-   // En modo prueba se fuerza el documento aunque un checkpoint viejo lo haya
-   // marcado completo; así se puede recuperar el piloto que quedó sin hallazgos.
    if(!limitePaginas&&checkpoint.documentosCompletos.includes(archivo.id))continue;
    console.log(`\n   📖 ${archivo.nombre}`);let buffer:Buffer;
    try{buffer=await descargarArchivo(archivo.id)}catch(err:any){console.error(`      ❌ Descarga: ${err.message}`);continue}
+   if(limitePaginas){
+    await this.limpiarDocumentoParaPrueba(archivo.id);
+    checkpoint.documentosCompletos=checkpoint.documentosCompletos.filter(id=>id!==archivo.id);
+    delete checkpoint.documentoEnProgreso;
+    this.guardarCheckpoint(checkpoint);
+   }
    const paginaInicial=limitePaginas?1:(checkpoint.documentoEnProgreso?.driveFileId===archivo.id?checkpoint.documentoEnProgreso.ultimaPaginaCompletada+1:1);
+
    try{
     await registrarDocumentoND({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta});
     let totalPaginas=0,totalGuardados=0,paginasCorrida=0,totalTexto=0,ultimaPagina=paginaInicial-1;
