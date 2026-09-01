@@ -1,13 +1,13 @@
 // ============================================================
 // verificarTurso.ts
-// Verifica que ARKON pueda conectarse realmente a Turso y que la
-// tabla propiedades_extraidas tenga el esquema esperado por la NE.
+// Verifica conexión con Turso y los dos destinos principales de
+// extracción: propiedades cuantitativas y evidencia documental ND.
 // No inserta, modifica ni borra datos.
 // ============================================================
 
 import { turso } from './src/turso/tursoClient';
 
-const COLUMNAS_ESPERADAS = [
+const COLUMNAS_ESPERADAS_PROPIEDADES = [
   'neurona_id', 'documento', 'drive_file_id', 'pagina', 'capitulo',
   'nombre_propiedad', 'nombre_ingles', 'sinonimos', 'categoria', 'tipo_propiedad',
   'familia_material', 'subfamilia_material', 'material', 'componente',
@@ -17,44 +17,59 @@ const COLUMNAS_ESPERADAS = [
   'origen_dato', 'observaciones', 'fragmento_texto',
 ];
 
+const COLUMNAS_ESPERADAS_ND = [
+  'neuron_id', 'tipo', 'campo', 'texto_original', 'texto_normalizado',
+  'entidad_candidata', 'valor', 'valor_texto', 'unidad', 'simbolo',
+  'contexto', 'idioma', 'confianza', 'evidencia_json', 'metadatos_json',
+  'documento_drive_id', 'pagina', 'posicion_inicio', 'posicion_fin',
+  'seccion', 'clave_unica',
+];
+
+async function verificarTabla(nombre: string, columnasEsperadas: string[]) {
+  const existe = await turso.execute({
+    sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+    args: [nombre],
+  });
+  if (existe.rows.length === 0) throw new Error(`La tabla ${nombre} NO existe en Turso.`);
+
+  const columnas = await turso.execute({ sql: `PRAGMA table_info(${nombre})`, args: [] });
+  const existentes = new Set(columnas.rows.map((r: any) => String(r.name)));
+  const faltantes = columnasEsperadas.filter(c => !existentes.has(c));
+  const conteo = await turso.execute({ sql: `SELECT COUNT(*) AS total FROM ${nombre}`, args: [] });
+  return { existentes, faltantes, total: conteo.rows[0]?.total ?? 0 };
+}
+
 async function main() {
   console.log('🔌 Verificando conexión con Turso...');
-
-  const tablas = await turso.execute({
-    sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'propiedades_extraidas'",
-    args: [],
-  });
-
-  if (tablas.rows.length === 0) {
-    throw new Error('La tabla propiedades_extraidas NO existe en Turso.');
-  }
-
-  const columnas = await turso.execute({
-    sql: 'PRAGMA table_info(propiedades_extraidas)',
-    args: [],
-  });
-
-  const existentes = new Set(columnas.rows.map((r: any) => String(r.name)));
-  const faltantes = COLUMNAS_ESPERADAS.filter(c => !existentes.has(c));
-
-  const conteo = await turso.execute({
-    sql: 'SELECT COUNT(*) AS total FROM propiedades_extraidas',
-    args: [],
-  });
-
+  await turso.execute({ sql: 'SELECT 1', args: [] });
   console.log('✅ Conexión Turso: OK');
-  console.log('✅ Tabla propiedades_extraidas: OK');
-  console.log(`📊 Registros actuales: ${conteo.rows[0]?.total ?? 0}`);
-  console.log(`📋 Columnas encontradas: ${existentes.size}`);
 
-  if (faltantes.length > 0) {
-    console.error(`❌ Faltan columnas: ${faltantes.join(', ')}`);
+  const propiedades = await verificarTabla('propiedades_extraidas', COLUMNAS_ESPERADAS_PROPIEDADES);
+  console.log('✅ Tabla propiedades_extraidas: OK');
+  console.log(`📊 propiedades_extraidas: ${propiedades.total} registros`);
+  console.log(`📋 propiedades_extraidas: ${propiedades.existentes.size} columnas`);
+  if (propiedades.faltantes.length) {
+    console.error(`❌ propiedades_extraidas — faltan: ${propiedades.faltantes.join(', ')}`);
     process.exitCode = 2;
-    return;
+  } else {
+    console.log('✅ Esquema propiedades_extraidas compatible con la NE.');
   }
 
-  console.log('✅ Esquema compatible con la NE.');
-  console.log('🏁 Verificación terminada: no se modificó ningún dato.');
+  // La tabla ND se crea de forma idempotente por guardarHallazgosND().
+  // Verificarla aquí permite detectar si el tramo documental está
+  // realmente conectado a Turso antes de iniciar una corrida masiva.
+  const nd = await verificarTabla('nd_hallazgos_raw', COLUMNAS_ESPERADAS_ND);
+  console.log('✅ Tabla nd_hallazgos_raw: OK');
+  console.log(`📊 nd_hallazgos_raw: ${nd.total} registros`);
+  console.log(`📋 nd_hallazgos_raw: ${nd.existentes.size} columnas`);
+  if (nd.faltantes.length) {
+    console.error(`❌ nd_hallazgos_raw — faltan: ${nd.faltantes.join(', ')}`);
+    process.exitCode = 2;
+  } else {
+    console.log('✅ Esquema nd_hallazgos_raw compatible con ND.');
+  }
+
+  if (!process.exitCode) console.log('🏁 Verificación terminada: no se modificó ningún dato.');
 }
 
 main().catch(err => {
