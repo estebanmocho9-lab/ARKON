@@ -1,17 +1,20 @@
 import { extraerDocumentalExhaustivoNDV3 } from './extractorDocumentalExhaustivoNDV3';
 import { extraerDatosCientificosND } from './extractorDatosCientificosND';
+import { normalizarHallazgosND } from './normalizadorHallazgosND';
 import { HallazgoND } from '../memoria-nd/tipos';
 
 /**
- * ND completo: primero identifica entidades concretas y luego conserva toda la
- * informacion documental asociada por aspecto. No resume definiciones.
- * Los datos numericos y formulas se conservan adicionalmente como evidencia
- * cuantitativa cruda para que no se pierdan aunque aun no esten anclados.
+ * ND completo: identifica entidades concretas y conserva la información
+ * documental asociada por aspecto. La normalización final corrige conflictos
+ * entre categorías (por ejemplo diámetro/espesor como MAGNITUD y no como
+ * PROPIEDAD) y agrega entidades materiales/atributos concretos que hayan
+ * quedado fuera de los diccionarios especializados.
  */
 export function extraerNDCompleto(texto:string,pagina:number,documento:string,neuronId:string):HallazgoND[]{
  const exhaustivo=extraerDocumentalExhaustivoNDV3(texto,pagina,documento,neuronId);
  const cuantitativo=extraerDatosCientificosND(texto,pagina,documento,neuronId);
- return dedup([...exhaustivo,...cuantitativo]);
+ const normalizados=normalizarHallazgosND([...exhaustivo,...cuantitativo],texto,pagina,documento,neuronId);
+ return dedup(normalizados);
 }
 
 function dedup(hallazgos:HallazgoND[]):HallazgoND[]{
