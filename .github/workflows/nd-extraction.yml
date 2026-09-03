@@ -41,4 +41,4 @@ jobs:
           echo "ND_CONFIG_OK"
 
       - name: Ejecutar lote ND
-        run: npm run extraer:nd:01
+        run: npm run extraer:nd:todas
