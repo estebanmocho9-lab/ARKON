@@ -1,0 +1,45 @@
+name: ND Extraction
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+concurrency:
+  group: nd-extraction
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      CARPETA_MADRE_DRIVE_ID: ${{ secrets.CARPETA_MADRE_DRIVE_ID }}
+      ND_DOCUMENTO_SELECCIONADO: ${{ vars.ND_DOCUMENTO_SELECCIONADO }}
+    steps:
+      - name: Checkout ND
+        uses: actions/checkout@v4
+        with:
+          ref: nd-extraccion-exhaustiva
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar configuración
+        run: |
+          test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
+          test -n "$CARPETA_MADRE_DRIVE_ID"
+          echo "ND_CONFIG_OK"
+
+      - name: Ejecutar lote ND
+        run: npm run extraer:nd:01
