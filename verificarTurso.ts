@@ -19,8 +19,38 @@ async function migrarColumnasND() {
   const r = await turso.execute({ sql: 'PRAGMA table_info(nd_ejecuciones)', args: [] });
   const columnas = new Set(r.rows.map((x:any) => String(x.name)));
 
-  // Versiones anteriores crearon `neurona_id`; el código ND actual usa `neuron_id`.
-  // Migramos sin borrar ni recrear la tabla para conservar ejecuciones existentes.
+  // Versiones anteriores crearon `neurona_id` como NOT NULL, mientras que
+  // el flujo actual escribe `neuron_id`. SQLite no permite quitar NOT NULL
+  // con ALTER COLUMN, así que reconstruimos solo esta tabla legacy una vez.
+  if (columnas.has('neurona_id') && columnas.has('neuron_id')) {
+    const neuronaNotNull = r.rows.some((x:any) => String(x.name) === 'neurona_id' && Number(x.notnull) === 1);
+    if (neuronaNotNull) {
+      await turso.executeMultiple(`
+        BEGIN;
+        CREATE TABLE nd_ejecuciones_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, neurona_id TEXT,
+          neuron_id TEXT NOT NULL, carpeta_drive TEXT,
+          documento_drive_id TEXT NOT NULL, documento TEXT NOT NULL,
+          estado TEXT NOT NULL DEFAULT 'en_proceso', extractor_version TEXT,
+          iniciado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, terminado_en TEXT, error TEXT
+        );
+        INSERT INTO nd_ejecuciones_new(
+          id,neurona_id,neuron_id,carpeta_drive,documento_drive_id,documento,estado,
+          extractor_version,iniciado_en,terminado_en,error
+        )
+        SELECT id,neurona_id,COALESCE(neuron_id,neurona_id),carpeta_drive,documento_drive_id,
+               documento,estado,extractor_version,iniciado_en,terminado_en,error
+        FROM nd_ejecuciones;
+        DROP TABLE nd_ejecuciones;
+        ALTER TABLE nd_ejecuciones_new RENAME TO nd_ejecuciones;
+        CREATE INDEX IF NOT EXISTS idx_nd_exec_doc ON nd_ejecuciones(documento_drive_id);
+        COMMIT;
+      `);
+      console.log('   🔧 Migración ND: nd_ejecuciones reconstruida para compatibilidad neuron_id/neurona_id.');
+      return;
+    }
+  }
+
   if (!columnas.has('neuron_id')) {
     await turso.execute({ sql: 'ALTER TABLE nd_ejecuciones ADD COLUMN neuron_id TEXT', args: [] });
     if (columnas.has('neurona_id')) {
