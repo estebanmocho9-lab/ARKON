@@ -24,10 +24,7 @@ function claveHallazgo(h: HallazgoND, documentoDriveId: string, pagina: number):
   const e = h.evidencia || {};
   return [h.neuronId, documentoDriveId || e.documento || '', pagina, h.tipo, h.campo || '', e.posicionInicio ?? '', e.posicionFin ?? '', normalizar(h.entidadPrincipal || h.entidadCandidata || '').toLowerCase(), h.aspecto || '', h.textoNormalizado || '', h.valorTexto || '', h.unidad || ''].join('¦');
 }
-
-function clavePagina(documentoDriveId: string, neuronId: string, pagina: number): string {
-  return `${documentoDriveId}¦${neuronId}¦${pagina}`;
-}
+function clavePagina(documentoDriveId: string, neuronId: string, pagina: number): string { return `${documentoDriveId}¦${neuronId}¦${pagina}`; }
 
 async function obtenerFilas(nombreHoja: string): Promise<string[][]> {
   const response = await sheets.spreadsheets.values.get({ spreadsheetId: getNDSpreadsheetId(), range: `${nombreHoja}!A:AZ` });
@@ -36,10 +33,7 @@ async function obtenerFilas(nombreHoja: string): Promise<string[][]> {
 
 async function asegurarHoja(nombre: string, headers: string[]): Promise<void> {
   const id = getNDSpreadsheetId();
-  try {
-    await sheets.spreadsheets.values.get({ spreadsheetId: id, range: `${nombre}!A1` });
-    return;
-  } catch {}
+  try { await sheets.spreadsheets.values.get({ spreadsheetId: id, range: `${nombre}!A1` }); return; } catch {}
   await sheets.spreadsheets.batchUpdate({ spreadsheetId: id, requestBody: { requests: [{ addSheet: { properties: { title: nombre } } }] } });
   await sheets.spreadsheets.values.update({ spreadsheetId: id, range: `${nombre}!A1`, valueInputOption: 'RAW', requestBody: { values: [headers] } });
 }
@@ -54,34 +48,31 @@ export async function prepararSheetsND(): Promise<void> {
   console.log(`   📊 ND -> Google Sheets: ${getNDSpreadsheetId()}`);
 }
 
-export async function paginaYaProcesadaNDSheets(documentoDriveId: string, neuronId: string, pagina: number): Promise<boolean> {
+export async function paginaYaProcesadaNDSheets(documentoDriveId:string, neuronId:string, pagina:number):Promise<boolean>{
   await prepararSheetsND();
-  const filas = await obtenerFilas(HOJA_PAGINAS);
-  const clave = clavePagina(documentoDriveId, neuronId, pagina);
-  for (let i = filas.length - 1; i >= 1; i--) if (filas[i]?.[0] === clave && filas[i]?.[6] === 'procesada') return true;
+  const filas=await obtenerFilas(HOJA_PAGINAS); const clave=clavePagina(documentoDriveId,neuronId,pagina);
+  for(let i=filas.length-1;i>=1;i--) if(filas[i]?.[0]===clave && filas[i]?.[6]==='procesada') return true;
   return false;
 }
 
-export async function registrarDocumentoNDSheets(a: {documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;paginasTotal?:number}): Promise<void> {
+export async function registrarDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;paginasTotal?:number}):Promise<void>{
   await prepararSheetsND();
-  await sheets.spreadsheets.values.append({ spreadsheetId: getNDSpreadsheetId(), range: `${HOJA_DOCUMENTOS}!A:J`, valueInputOption:'RAW', insertDataOption:'INSERT_ROWS', requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','','',ahora()]]} });
+  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','',ahora()]]}});
 }
 
-export async function registrarEstadoDocumentoNDSheets(a: {documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;estado:string;paginasTotal?:number;paginasProcesadas?:number;hallazgosTotal?:number}): Promise<void> {
+export async function registrarEstadoDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;estado:string;paginasTotal?:number;paginasProcesadas?:number;hallazgosTotal?:number}):Promise<void>{
   await prepararSheetsND();
-  await sheets.spreadsheets.values.append({ spreadsheetId:getNDSpreadsheetId(), range:`${HOJA_DOCUMENTOS}!A:J`, valueInputOption:'RAW', insertDataOption:'INSERT_ROWS', requestBody:{values:[['ESTADO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),valorSeguro(a.estado),numero(a.paginasTotal),numero(a.paginasProcesadas),numero(a.hallazgosTotal),ahora()]]} });
+  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['ESTADO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),valorSeguro(a.estado),numero(a.paginasTotal),numero(a.paginasProcesadas),numero(a.hallazgosTotal),ahora()]]}});
 }
 
-export async function guardarPaginaNDSheets(hallazgos: HallazgoND[], documentoDriveId:string, documento:string, neuronId:string, carpetaDrive:string, pagina:number): Promise<number> {
+export async function guardarPaginaNDSheets(hallazgos:HallazgoND[],documentoDriveId:string,documento:string,neuronId:string,carpetaDrive:string,pagina:number):Promise<number>{
   await prepararSheetsND();
-  if (await paginaYaProcesadaNDSheets(documentoDriveId, neuronId, pagina)) return 0;
-  const filas = await obtenerFilas(HOJA_HALLAZGOS);
-  const existentes = new Set<string>();
-  for (let i=1;i<filas.length;i++) if (filas[i]?.[0]) existentes.add(filas[i][0]);
+  if(await paginaYaProcesadaNDSheets(documentoDriveId,neuronId,pagina)) return 0;
+  const filas=await obtenerFilas(HOJA_HALLAZGOS); const existentes=new Set<string>();
+  for(let i=1;i<filas.length;i++) if(filas[i]?.[0]) existentes.add(filas[i][0]);
   const nuevas:string[][]=[];
-  for (const h of hallazgos) {
-    const clave=claveHallazgo(h,documentoDriveId,pagina);
-    if (existentes.has(clave)) continue;
+  for(const h of hallazgos){
+    const clave=claveHallazgo(h,documentoDriveId,pagina); if(existentes.has(clave)) continue;
     const evidencia={...(h.evidencia||{}),documento,pagina};
     const metadatos={...(h.metadatos||{}),documentoDriveId,carpetaDrive,persistencia:'google_sheets'};
     nuevas.push([valorSeguro(clave),valorSeguro(documentoDriveId),valorSeguro(documento),valorSeguro(neuronId),valorSeguro(carpetaDrive),numero(pagina),valorSeguro(h.tipo),valorSeguro(h.campo),valorSeguro(h.entidadCandidata),valorSeguro(h.entidadPrincipal),valorSeguro(h.aspecto),valorSeguro(h.datoDocumental),valorSeguro(h.textoOriginal),valorSeguro(h.textoNormalizado),numero(h.valor),valorSeguro(h.valorTexto),valorSeguro(h.unidad),valorSeguro(h.simbolo),valorSeguro(h.relacionEntidad),valorSeguro(h.contexto),valorSeguro(h.idioma),numero(h.confianza),JSON.stringify(evidencia),JSON.stringify(metadatos),ahora()]);
