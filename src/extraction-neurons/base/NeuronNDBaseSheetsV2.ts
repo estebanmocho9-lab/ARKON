@@ -7,6 +7,7 @@ import { ejecutarDeterministaND } from '../nd-deterministic/runDeterministicND';
 import { procesarDocumentoND, PaginaND } from './procesadorDocumentoND';
 
 const CHECKPOINTS=path.join(process.cwd(),'checkpoints');
+const FORZAR_REANALISIS=process.env.ND_REANALIZAR==='1';
 interface CheckpointND{documentosCompletos:string[];documentoEnProgreso?:{driveFileId:string;ultimaPaginaCompletada:number}}
 
 export abstract class NeuronNDBaseSheetsV2{
@@ -28,11 +29,11 @@ export abstract class NeuronNDBaseSheetsV2{
   let hechos=0;
   for(const archivo of archivos){
    if(limiteDocumentos&&hechos>=limiteDocumentos)break;
-   if(!limitePaginas&&cp.documentosCompletos.includes(archivo.id))continue;
+   if(!FORZAR_REANALISIS&&!limitePaginas&&cp.documentosCompletos.includes(archivo.id))continue;
    console.log(`\n   📖 ${archivo.nombre}`);
    let buffer:Buffer;
    try{buffer=await descargarArchivo(archivo.id)}catch(e:any){console.error(`      ❌ Drive: ${e?.message||e}`);continue}
-   const inicio=limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
+   const inicio=FORZAR_REANALISIS||limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
    try{
     await registrarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta});
     const todas=await extraerPaginas(buffer);
@@ -42,17 +43,19 @@ export abstract class NeuronNDBaseSheetsV2{
     let determinista:{pages:any[];findings:any[]}={pages:[],findings:[]};
     try{
      determinista=await ejecutarDeterministaND(buffer,inicio,limitePaginas?Math.min(limitePaginas,todas.length):todas.length);
+     console.log(`      🔎 Determinista ND: ${determinista.findings.length} hallazgos, ${determinista.pages.length} páginas`);
     }catch(e:any){
      console.warn(`      ⚠️ Determinista ND omitido: ${e?.message||e}`);
     }
     const resultado=procesarDocumentoND(paginas,archivo.nombre,archivo.id,this.neuronId,determinista.findings);
+    console.log(`      🧠 ND fusionado: ${resultado.hallazgos.length} hallazgos`);
     const porPagina=new Map<number,typeof resultado.hallazgos>();
     for(const h of resultado.hallazgos){const a=porPagina.get(h.evidencia.pagina)||[];a.push(h);porPagina.set(h.evidencia.pagina,a)}
     let guardados=0,procesadas=0,last=inicio-1;
     for(const pagina of seleccion){
      if(pagina.pagina<inicio)continue;
      if(limitePaginas&&pagina.pagina>limitePaginas)break;
-     if(!limitePaginas&&await paginaYaProcesadaNDSheets(archivo.id,this.neuronId,pagina.pagina))continue;
+     if(!FORZAR_REANALISIS&&!limitePaginas&&await paginaYaProcesadaNDSheets(archivo.id,this.neuronId,pagina.pagina))continue;
      const hs=porPagina.get(pagina.pagina)||[];
      const cap=detectarCapitulo(pagina.texto||'');
      for(const h of hs){h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,motor:'ND-comprension-bloques-5extractores-determinista-16RAM'};if(cap)h.evidencia.seccion=cap}
