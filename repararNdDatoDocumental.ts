@@ -13,15 +13,20 @@ async function main() {
   const nuevo = original.replace(/dato_documental\s+TEXT\s+NOT\s+NULL/ig, 'dato_documental TEXT');
   if (nuevo === original) throw new Error('No se pudo localizar la definición legacy de dato_documental.');
 
-  await turso.execute({ sql: 'PRAGMA writable_schema=ON', args: [] });
+  // SQLite/Turso no permite writable_schema. Reconstruimos la tabla preservando todos los datos.
+  await turso.execute({ sql: 'BEGIN', args: [] });
   try {
-    await turso.execute({
-      sql: "UPDATE sqlite_master SET sql=? WHERE type='table' AND name='nd_datos_entidad'",
-      args: [nuevo]
-    });
-    await turso.execute({ sql: 'PRAGMA schema_version = schema_version + 1', args: [] });
-  } finally {
-    await turso.execute({ sql: 'PRAGMA writable_schema=OFF', args: [] });
+    await turso.execute({ sql: nuevo.replace(/^CREATE TABLE\s+/i, 'CREATE TABLE nd_datos_entidad_new '), args: [] });
+    const cols = await turso.execute({ sql: 'PRAGMA table_info(nd_datos_entidad)', args: [] });
+    const names = cols.rows.map((x:any) => String(x.name));
+    const list = names.map((n:string) => '"' + n.replace(/"/g, '""') + '"').join(', ');
+    await turso.execute({ sql: `INSERT INTO nd_datos_entidad_new (${list}) SELECT ${list} FROM nd_datos_entidad`, args: [] });
+    await turso.execute({ sql: 'DROP TABLE nd_datos_entidad', args: [] });
+    await turso.execute({ sql: 'ALTER TABLE nd_datos_entidad_new RENAME TO nd_datos_entidad', args: [] });
+    await turso.execute({ sql: 'COMMIT', args: [] });
+  } catch (e) {
+    try { await turso.execute({ sql: 'ROLLBACK', args: [] }); } catch {}
+    throw e;
   }
 
   const v = await turso.execute({ sql: 'PRAGMA table_info(nd_datos_entidad)', args: [] });
@@ -30,7 +35,7 @@ async function main() {
 
   console.log('🔧 nd_datos_entidad.dato_documental: NOT NULL -> nullable.');
   console.log('   • Datos existentes preservados.');
-  console.log('   • No se borró ni recreó la tabla.');
+  console.log('   • Tabla reconstruida sin writable_schema.');
 }
 
 main().catch(err => { console.error('❌ Reparación ND:', err?.message || err); process.exit(1); });
