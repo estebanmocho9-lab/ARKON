@@ -1,20 +1,33 @@
+// ============================================================
+// ARKON — CONEXION ND -> GOOGLE SHEETS
+//
+// ND usa la cuenta de usuario activa de gcloud en Cloud Shell para
+// el DESTINO Sheets. No reutiliza credentials.json para crear hojas.
+// credentials.json queda reservado al acceso de Drive/origen.
+//
+// Cada PDF recibe una spreadsheet independiente. No existe una
+// spreadsheet global de ND ni un ID fijo de resultados.
+// ============================================================
+
 import { google } from 'googleapis';
-import * as fs from 'fs';
-import * as path from 'path';
+import { execFileSync } from 'child_process';
 
-// ND crea una spreadsheet independiente por cada PDF.
-// La misma cuenta de servicio que lee Drive crea y escribe el resultado.
-const credentialsPath = path.join(process.cwd(), 'credentials.json');
-if (!fs.existsSync(credentialsPath)) throw new Error('No se encontró credentials.json en la raíz del proyecto');
-const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+const sheetsAuth: any = {
+  async getRequestHeaders() {
+    const token = execFileSync('gcloud', ['auth', 'print-access-token'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    if (!token) throw new Error('gcloud no devolvió un access token para la cuenta activa.');
+    return { Authorization: `Bearer ${token}` };
+  },
+  async getRequestMetadata() {
+    return this.getRequestHeaders();
+  },
+};
 
-const auth = new google.auth.GoogleAuth({
-  credentials: { client_email: credentials.client_email, private_key: credentials.private_key },
-  scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'],
-});
-
-export const sheets = google.sheets({ version: 'v4', auth });
-export const drive = google.drive({ version: 'v3', auth });
+export const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
+export const drive = google.drive({ version: 'v3', auth: sheetsAuth });
 
 let spreadsheetId = '';
 
@@ -30,26 +43,24 @@ export async function prepararConexionSheetsND(): Promise<string> {
 }
 
 export async function crearSpreadsheetND(nombreDocumento: string): Promise<string> {
-  const requestBody: any = { properties: { title: `ARKON_ND_${nombreDocumento}` } };
-  // Si se configura ND_SHEETS_FOLDER_ID, la spreadsheet se crea directamente
-  // en esa carpeta de Drive (por ejemplo, una carpeta compartida de SM).
-  const folderId = process.env.ND_SHEETS_FOLDER_ID?.trim();
-  if (folderId) requestBody.parents = [folderId];
+  const about = await drive.about.get({ fields: 'user(emailAddress)' });
+  const email = about.data.user?.emailAddress || 'cuenta de Google activa';
+  console.log(`   👤 ND Sheets autenticado como: ${email}`);
 
-  const creado = await drive.files.create({
-    requestBody: {
-      name: requestBody.properties.title,
-      mimeType: 'application/vnd.google-apps.spreadsheet',
-      ...(folderId ? { parents: [folderId] } : {}),
-    },
-    fields: 'id,name,parents',
-    supportsAllDrives: true,
+  const safe = String(nombreDocumento)
+    .replace(/[\/\\?*\[\]:]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150) || 'PDF';
+
+  const creado = await sheets.spreadsheets.create({
+    requestBody: { properties: { title: `ARKON_ND_${safe}` } },
   });
-  const id = creado.data.id;
-  if (!id) throw new Error('Google Drive no devolvió el ID de la spreadsheet ND.');
+  const id = creado.data.spreadsheetId;
+  if (!id) throw new Error('Google Sheets no devolvió spreadsheetId al crear la hoja ND.');
+
   setNDSpreadsheetId(id);
-  console.log(`   🆕 Spreadsheet ND creada: ${creado.data.name || requestBody.properties.title}`);
+  console.log(`   🆕 Spreadsheet ND creada bajo la cuenta de usuario activa: ARKON_ND_${safe}`);
   console.log(`   🔗 Spreadsheet ID: ${id}`);
-  if (folderId) console.log(`   📁 Carpeta Sheets ND: ${folderId}`);
   return id;
 }
