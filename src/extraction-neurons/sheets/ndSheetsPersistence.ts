@@ -62,7 +62,7 @@ export async function paginaYaProcesadaNDSheets(documentoDriveId:string, neuronI
 
 export async function registrarDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;paginasTotal?:number}):Promise<void>{
   await prepararSheetsND();
-  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','',ahora()]]}});
+  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','',ahora()]]}});
 }
 
 export async function registrarEstadoDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;estado:string;paginasTotal?:number;paginasProcesadas?:number;hallazgosTotal?:number}):Promise<void>{
