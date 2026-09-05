@@ -1,41 +1,50 @@
 // ============================================================
 // ARKON — CONEXION ND -> GOOGLE SHEETS
 //
-// ND usa las credenciales de usuario disponibles como ADC en
-// Cloud Shell. No reutiliza el service account de credentials.json
-// usado por el lector de Drive/NE.
+// ND usa la cuenta de usuario activa de gcloud en Cloud Shell para
+// el DESTINO Sheets. No reutiliza credentials.json (que pertenece
+// al lector de Drive/NE y al origen de los PDFs).
 //
-// Si ND_GOOGLE_SHEETS_ID existe, se usa esa hoja.
-// Si no existe, se crea una hoja nueva una sola vez y se guarda
-// su ID en checkpoints/ND_GOOGLE_SHEETS_ID.
+// Esto permite que las hojas creadas por ND pertenezcan a la cuenta
+// de usuario activa (SM cuando esa es la cuenta conectada).
 // ============================================================
 
 import { google } from 'googleapis';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export const sheetsAuth = new google.auth.GoogleAuth({
-  scopes: [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive',
-  ],
-});
+const SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive',
+];
+
+// googleapis acepta un objeto de autenticación que expone
+// getRequestHeaders(). Renovamos el token mediante gcloud antes
+// de cada llamada, evitando tokens vencidos durante extracciones largas.
+const sheetsAuth: any = {
+  async getRequestHeaders() {
+    const token = execFileSync('gcloud', ['auth', 'print-access-token'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    if (!token) throw new Error('gcloud no devolvió un access token para la cuenta activa.');
+    return { Authorization: `Bearer ${token}` };
+  },
+  async getRequestMetadata() {
+    return this.getRequestHeaders();
+  },
+};
 
 export const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
 
 let SPREADSHEET_ID = process.env.ND_GOOGLE_SHEETS_ID || '';
-
 const ID_FILE = path.join(process.cwd(), 'checkpoints', 'ND_GOOGLE_SHEETS_ID');
 
 function leerIdPersistido(): string {
   try {
-    if (fs.existsSync(ID_FILE)) {
-      const id = fs.readFileSync(ID_FILE, 'utf8').trim();
-      if (id) return id;
-    }
-  } catch {
-    // Se vuelve a crear si no se puede leer el checkpoint.
-  }
+    if (fs.existsSync(ID_FILE)) return fs.readFileSync(ID_FILE, 'utf8').trim();
+  } catch {}
   return '';
 }
 
@@ -54,18 +63,14 @@ export async function prepararConexionSheetsND(): Promise<string> {
     return SPREADSHEET_ID;
   }
 
-  // Valida que las credenciales de usuario puedan acceder a Drive.
+  // El mismo token de gcloud identifica al usuario dueño de la hoja.
   const drive = google.drive({ version: 'v3', auth: sheetsAuth });
   const about = await drive.about.get({ fields: 'user(emailAddress)' });
-  const email = about.data.user?.emailAddress || 'cuenta de Google autenticada';
+  const email = about.data.user?.emailAddress || 'cuenta de Google activa';
   console.log(`   👤 ND Sheets autenticado como: ${email}`);
 
   const creado = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: {
-        title: 'ARKON ND - Extracción',
-      },
-    },
+    requestBody: { properties: { title: 'ARKON ND - Extracción' } },
   });
 
   const id = creado.data.spreadsheetId;
@@ -73,14 +78,11 @@ export async function prepararConexionSheetsND(): Promise<string> {
 
   SPREADSHEET_ID = id;
   guardarIdPersistido(id);
-
   console.log(`   🆕 Hoja ND creada: https://docs.google.com/spreadsheets/d/${id}/edit`);
   return id;
 }
 
 export function getNDSpreadsheetId(): string {
-  if (!SPREADSHEET_ID) {
-    throw new Error('La conexión ND de Google Sheets todavía no fue preparada.');
-  }
+  if (!SPREADSHEET_ID) throw new Error('La conexión ND de Google Sheets todavía no fue preparada.');
   return SPREADSHEET_ID;
 }
