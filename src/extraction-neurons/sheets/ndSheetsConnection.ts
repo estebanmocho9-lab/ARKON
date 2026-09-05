@@ -13,12 +13,10 @@ import { google } from 'googleapis';
 import { execFileSync } from 'child_process';
 
 /**
- * googleapis no acepta un objeto plano con getRequestHeaders() como
- * auth client: internamente necesita authClient.request().
- *
- * Extendemos OAuth2Client para conservar el request() real de
- * google-auth-library y obtenemos el token de la cuenta activa de
- * gcloud cada vez que Google necesita metadata de autenticacion.
+ * google-auth-library moderno espera Headers reales en la metadata
+ * devuelta por getRequestMetadataAsync(). Un objeto plano {headers: {}}
+ * provoca "source.get is not a function" dentro de
+ * addUserProjectAndAuthHeaders().
  */
 class GcloudUserAuth extends google.auth.OAuth2 {
   private token(): string {
@@ -26,9 +24,11 @@ class GcloudUserAuth extends google.auth.OAuth2 {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
+
     if (!token) {
       throw new Error('gcloud no devolvió un access token para la cuenta activa.');
     }
+
     return token;
   }
 
@@ -37,11 +37,9 @@ class GcloudUserAuth extends google.auth.OAuth2 {
   }
 
   async getRequestMetadataAsync(): Promise<any> {
-    return {
-      headers: {
-        Authorization: `Bearer ${this.token()}`,
-      },
-    };
+    const headers = new Headers();
+    headers.set('Authorization', `Bearer ${this.token()}`);
+    return { headers };
   }
 }
 
