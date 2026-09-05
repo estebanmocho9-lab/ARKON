@@ -15,6 +15,21 @@ const TABLAS = [
   'nd_definiciones','nd_evidencias','nd_formulas'
 ];
 
+async function migrarColumnasND() {
+  const r = await turso.execute({ sql: 'PRAGMA table_info(nd_ejecuciones)', args: [] });
+  const columnas = new Set(r.rows.map((x:any) => String(x.name)));
+
+  // Versiones anteriores crearon `neurona_id`; el código ND actual usa `neuron_id`.
+  // Migramos sin borrar ni recrear la tabla para conservar ejecuciones existentes.
+  if (!columnas.has('neuron_id')) {
+    await turso.execute({ sql: 'ALTER TABLE nd_ejecuciones ADD COLUMN neuron_id TEXT', args: [] });
+    if (columnas.has('neurona_id')) {
+      await turso.execute({ sql: 'UPDATE nd_ejecuciones SET neuron_id=neurona_id WHERE neuron_id IS NULL', args: [] });
+    }
+    console.log('   🔧 Migración ND: nd_ejecuciones.neuron_id creada y sincronizada.');
+  }
+}
+
 async function main() {
   console.log('🔌 Verificando conexión con Turso...');
   await turso.execute({ sql: 'SELECT 1', args: [] });
@@ -22,6 +37,7 @@ async function main() {
 
   console.log('🧾 Preparando esquema completo ND en Turso...');
   await prepararEsquemaNDTurso();
+  await migrarColumnasND();
 
   let fallos = 0;
   console.log('\n📚 TABLAS DOCUMENTALES ND:');
@@ -39,6 +55,13 @@ async function main() {
   const faltantes = TABLAS.filter(t => !reales.includes(t));
   if (faltantes.length) {
     console.error(`\n❌ Faltan tablas: ${faltantes.join(', ')}`);
+    fallos++;
+  }
+
+  const columnasExec = await turso.execute({ sql: 'PRAGMA table_info(nd_ejecuciones)', args: [] });
+  const nombresExec = columnasExec.rows.map((x:any) => String(x.name));
+  if (!nombresExec.includes('neuron_id')) {
+    console.error('\n❌ nd_ejecuciones sigue sin neuron_id.');
     fallos++;
   }
 
