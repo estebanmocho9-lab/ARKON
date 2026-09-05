@@ -8,6 +8,7 @@ import { HallazgoND } from '../memoria-nd/tipos';
 const HOJA_DOCUMENTOS = 'ND_DOCUMENTOS';
 const HOJA_PAGINAS = 'ND_PAGINAS';
 const HOJA_HALLAZGOS = 'ND_HALLAZGOS';
+const FORZAR_REEXTRACCION = process.env.ND_REANALIZAR === '1';
 
 const CABECERA_DOCUMENTOS = ['evento','documento_drive_id','documento','neuron_id','carpeta_drive','estado','paginas_total','paginas_procesadas','hallazgos_total','timestamp'];
 const CABECERA_PAGINAS = ['clave_pagina','documento_drive_id','documento','neuron_id','carpeta_drive','pagina','estado','hallazgos','timestamp'];
@@ -46,10 +47,12 @@ export async function prepararSheetsND(): Promise<void> {
   await asegurarHoja(HOJA_HALLAZGOS, CABECERA_HALLAZGOS);
   hojasPreparadas = true;
   console.log(`   📊 ND -> Google Sheets: ${getNDSpreadsheetId()}`);
+  if (FORZAR_REEXTRACCION) console.log('   🔁 ND_REANALIZAR=1: se ignoran checkpoints y estados de página; las claves de hallazgo siguen evitando duplicados.');
 }
 
 export async function paginaYaProcesadaNDSheets(documentoDriveId:string, neuronId:string, pagina:number):Promise<boolean>{
   await prepararSheetsND();
+  if (FORZAR_REEXTRACCION) return false;
   const filas=await obtenerFilas(HOJA_PAGINAS); const clave=clavePagina(documentoDriveId,neuronId,pagina);
   for(let i=filas.length-1;i>=1;i--) if(filas[i]?.[0]===clave && filas[i]?.[6]==='procesada') return true;
   return false;
@@ -57,7 +60,7 @@ export async function paginaYaProcesadaNDSheets(documentoDriveId:string, neuronI
 
 export async function registrarDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;paginasTotal?:number}):Promise<void>{
   await prepararSheetsND();
-  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','',ahora()]]}});
+  await sheets.spreadsheets.values.append({spreadsheetId:getNDSpreadsheetId(),range:`${HOJA_DOCUMENTOS}!A:J`,valueInputOption:'RAW',insertDataOption:'INSERT_ROWS',requestBody:{values:[['INICIO',valorSeguro(a.documentoDriveId),valorSeguro(a.nombre),valorSeguro(a.nombre),valorSeguro(a.neuronId),valorSeguro(a.carpetaDrive),'en_proceso',numero(a.paginasTotal),'','',ahora()]]}});
 }
 
 export async function registrarEstadoDocumentoNDSheets(a:{documentoDriveId:string;nombre:string;neuronId:string;carpetaDrive?:string;estado:string;paginasTotal?:number;paginasProcesadas?:number;hallazgosTotal?:number}):Promise<void>{
