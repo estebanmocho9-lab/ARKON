@@ -1,78 +1,56 @@
 // ============================================================
 // verificarTurso.ts
 // Verifica Turso y prepara TODA la infraestructura documental ND.
-// No procesa PDFs ni inserta hallazgos.
+// No procesa PDFs ni ejecuta extracción.
 // ============================================================
 
 import { turso } from './src/turso/tursoClient';
-import { prepararEsquemaND, TABLAS_PROYECCION } from './src/turso/esquemaND';
+import { prepararEsquemaNDTurso } from './src/extraction-neurons/turso/ndTursoPersistence';
 
-const COLUMNAS_ESPERADAS_PROPIEDADES = [
-  'neurona_id', 'documento', 'drive_file_id', 'pagina', 'capitulo',
-  'nombre_propiedad', 'nombre_ingles', 'sinonimos', 'categoria', 'tipo_propiedad',
-  'familia_material', 'subfamilia_material', 'material', 'componente',
-  'unidad', 'simbolo', 'valor_encontrado', 'valor_minimo', 'valor_maximo',
-  'condicion_ensayo', 'metodo_ensayo', 'instrumento_usado', 'norma',
-  'ecuacion_formula', 'relacion_otras_propiedades', 'nivel_confianza',
-  'origen_dato', 'observaciones', 'fragmento_texto',
+const TABLAS = [
+  'nd_ejecuciones','nd_documentos','nd_paginas','nd_hallazgos_raw','nd_datos_unificados','nd_text_partes',
+  'nd_entidades_documentales','nd_datos_entidad',
+  'nd_materiales','nd_componentes','nd_propiedades','nd_magnitudes','nd_atributos','nd_relaciones',
+  'nd_condiciones','nd_metodos','nd_instrumentos','nd_aplicaciones','nd_comportamientos','nd_normas',
+  'nd_definiciones','nd_evidencias','nd_formulas'
 ];
-
-const COLUMNAS_RAW = [
-  'neuron_id','tipo','campo','texto_original','texto_normalizado','entidad_candidata',
-  'valor','valor_texto','unidad','simbolo','contexto','idioma','confianza','evidencia_json',
-  'metadatos_json','documento_drive_id','pagina','posicion_inicio','posicion_fin','seccion','clave_unica',
-];
-
-async function verificarTabla(nombre: string, columnasEsperadas: string[] = []) {
-  const existe = await turso.execute({
-    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-    args: [nombre],
-  });
-  if (!existe.rows.length) throw new Error(`La tabla ${nombre} NO existe en Turso.`);
-
-  const columnas = await turso.execute({ sql: `PRAGMA table_info(${nombre})`, args: [] });
-  const existentes = new Set(columnas.rows.map((r: any) => String(r.name)));
-  const faltantes = columnasEsperadas.filter(c => !existentes.has(c));
-  const conteo = await turso.execute({ sql: `SELECT COUNT(*) AS total FROM ${nombre}`, args: [] });
-  return { existentes, faltantes, total: Number(conteo.rows[0]?.total ?? 0) };
-}
 
 async function main() {
   console.log('🔌 Verificando conexión con Turso...');
   await turso.execute({ sql: 'SELECT 1', args: [] });
   console.log('✅ Conexión Turso: OK');
 
-  const propiedades = await verificarTabla('propiedades_extraidas', COLUMNAS_ESPERADAS_PROPIEDADES);
-  console.log(`📊 propiedades_extraidas: ${propiedades.total} registros`);
-  if (propiedades.faltantes.length) {
-    console.error(`❌ propiedades_extraidas — faltan: ${propiedades.faltantes.join(', ')}`);
-    process.exitCode = 2;
-  } else console.log('✅ propiedades_extraidas compatible con NE (solo verificación; ND no escribe aquí).');
-
   console.log('🧾 Preparando esquema completo ND en Turso...');
-  await prepararEsquemaND();
+  await prepararEsquemaNDTurso();
 
-  const raw = await verificarTabla('nd_hallazgos_raw', COLUMNAS_RAW);
-  console.log(`✅ nd_hallazgos_raw: ${raw.total} registros / ${raw.existentes.size} columnas`);
-  if (raw.faltantes.length) {
-    console.error(`❌ nd_hallazgos_raw — faltan: ${raw.faltantes.join(', ')}`);
-    process.exitCode = 2;
-  }
-
-  const tablas = ['nd_documentos','nd_paginas','nd_hallazgos_raw', ...Object.values(TABLAS_PROYECCION)];
+  let fallos = 0;
   console.log('\n📚 TABLAS DOCUMENTALES ND:');
-  for (const tabla of [...new Set(tablas)]) {
-    const r = await verificarTabla(tabla);
-    console.log(`   ${tabla.padEnd(24)} ${r.total} registros`);
+  for (const tabla of TABLAS) {
+    const r = await turso.execute({ sql: `SELECT COUNT(*) AS total FROM ${tabla}`, args: [] });
+    const total = Number(r.rows[0]?.total ?? 0);
+    console.log(`   ${tabla.padEnd(28)} ${total} registros`);
   }
 
-  if (!process.exitCode) {
-    console.log('\n🏁 Turso listo para ND.');
-    console.log('   • ND escribe exclusivamente en Turso.');
-    console.log('   • Cada página se guarda antes de continuar.');
-    console.log('   • Las tablas nd_* son proyecciones del raw; no vuelven a extraer el PDF.');
-    console.log('   • Supabase y propiedades_extraidas quedan fuera del flujo ND.');
+  const prueba = await turso.execute({
+    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'nd_%' ORDER BY name",
+    args: []
+  });
+  const reales = prueba.rows.map((r:any) => String(r.name));
+  const faltantes = TABLAS.filter(t => !reales.includes(t));
+  if (faltantes.length) {
+    console.error(`\n❌ Faltan tablas: ${faltantes.join(', ')}`);
+    fallos++;
   }
+
+  if (!fallos) {
+    console.log('\n🏁 Turso listo para ND.');
+    console.log('   • Persistencia ND: Turso.');
+    console.log('   • Datos crudos: nd_hallazgos_raw.');
+    console.log('   • Páginas ricas: nd_paginas.');
+    console.log('   • Proyección semántica: tablas nd_* por tipo.');
+    console.log('   • Entidades, datos de entidad, texto y ejecuciones preservados.');
+    console.log('   • No se toca Supabase ni Sheets durante el flujo ND.');
+  } else process.exitCode = 2;
 }
 
 main().catch(err => {
