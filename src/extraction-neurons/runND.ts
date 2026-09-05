@@ -1,7 +1,7 @@
 // ============================================================
 // runND.ts — runner EXCLUSIVO de las neuronas documentales ND.
-// Drive -> PDF -> ND-01...ND-10 -> Google Sheets.
-// No ejecuta NE, Supabase ni Turso.
+// Drive -> PDF -> ND-01...ND-10 -> Turso.
+// No ejecuta NE ni Supabase.
 // ============================================================
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -33,12 +33,12 @@ async function main() {
   console.log('\n============================================================');
   console.log(' ARKON — EXTRACCION ND');
   console.log('============================================================');
-  console.log(' Persistencia: GOOGLE SHEETS');
-  console.log(' Turso:        DESCONECTADO');
+  console.log(' Persistencia: TURSO');
+  console.log(' Sheets:       DESCONECTADO');
   console.log(' Supabase:     DESCONECTADO');
   console.log(' NE:           NO EJECUTADA');
   console.log('============================================================');
-  console.log(' ℹ️  Las spreadsheets ND se crean dentro del flujo de cada PDF.');
+  console.log(' ℹ️  Cada PDF se procesa y sus datos documentales se guardan en Turso.');
 
   const ids = objetivo === 'todas' ? Object.keys(NEURONAS) : [objetivo.padStart(2, '0')];
   for (const id of ids) {
@@ -47,8 +47,8 @@ async function main() {
     await crear().ejecutar(limiteDocumentos, limitePaginas, nombreObjetivo);
   }
   console.log('\n🏁 ND finalizada.');
-  console.log('   💾 Destino: Google Sheets.');
-  console.log('   🚫 Turso no participa.');
+  console.log('   💾 Destino: Turso.');
+  console.log('   🚫 Google Sheets no participa.');
   console.log('   🚫 Supabase no participa.');
   console.log('   🚫 NE-01...NE-10 no fueron ejecutadas.');
 }
