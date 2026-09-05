@@ -2,14 +2,10 @@
 // runND.ts — runner EXCLUSIVO de las neuronas documentales ND.
 // Drive -> PDF -> ND-01...ND-10 -> Google Sheets.
 // No ejecuta NE, Supabase ni Turso.
-//
-// Uso:
-//   npx ts-node --transpile-only src/extraction-neurons/runND.ts 01
-//   npx ts-node --transpile-only src/extraction-neurons/runND.ts 01 1 5
-//   npx ts-node --transpile-only src/extraction-neurons/runND.ts todas
 // ============================================================
 import * as dotenv from 'dotenv';
 dotenv.config();
+import { NeuronNDBaseSheetsV2 } from './base/NeuronNDBaseSheetsV2';
 import { ND01 } from './neuronas/ND01';
 import { ND02 } from './neuronas/ND02';
 import { ND03 } from './neuronas/ND03';
@@ -22,7 +18,7 @@ import { ND09 } from './neuronas/ND09';
 import { ND10 } from './neuronas/ND10';
 import { prepararSheetsND } from './sheets/ndSheetsPersistence';
 
-const NEURONAS: Record<string, () => { ejecutar: (limiteDocumentos?: number, limitePaginas?: number) => Promise<void> }> = {
+const NEURONAS: Record<string, () => NeuronNDBaseSheetsV2> = {
   '01': () => new ND01(), '02': () => new ND02(), '03': () => new ND03(), '04': () => new ND04(), '05': () => new ND05(),
   '06': () => new ND06(), '07': () => new ND07(), '08': () => new ND08(), '09': () => new ND09(), '10': () => new ND10(),
 };
@@ -31,6 +27,7 @@ async function main() {
   const objetivo = process.argv[2] || '01';
   const limiteDocumentos = process.argv[3] ? Number(process.argv[3]) : undefined;
   const limitePaginas = process.argv[4] ? Number(process.argv[4]) : undefined;
+  const nombreObjetivo = process.argv[5] || undefined;
   if (limiteDocumentos !== undefined && (!Number.isInteger(limiteDocumentos) || limiteDocumentos < 1)) throw new Error('El límite de documentos debe ser un entero positivo.');
   if (limitePaginas !== undefined && (!Number.isInteger(limitePaginas) || limitePaginas < 1)) throw new Error('El límite de páginas debe ser un entero positivo.');
 
@@ -48,7 +45,7 @@ async function main() {
   for (const id of ids) {
     const crear = NEURONAS[id];
     if (!crear) throw new Error(`ND no disponible para la carpeta ${id}.`);
-    await crear().ejecutar(limiteDocumentos, limitePaginas);
+    await crear().ejecutar(limiteDocumentos, limitePaginas, nombreObjetivo);
   }
   console.log('\n🏁 ND finalizada.');
   console.log('   💾 Destino: Google Sheets.');
