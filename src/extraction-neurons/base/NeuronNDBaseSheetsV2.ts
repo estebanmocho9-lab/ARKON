@@ -39,7 +39,12 @@ export abstract class NeuronNDBaseSheetsV2{
     const seleccion=limitePaginas?todas.slice(0,limitePaginas):todas;
     const paginas:PaginaND[]=[];let off=0;
     for(const x of todas){const t=x.texto||'';paginas.push({pagina:x.pagina,texto:t,inicio:off,fin:off+t.length});off+=t.length+2}
-    const determinista=await ejecutarDeterministaND(buffer,inicio,limitePaginas?Math.min(limitePaginas,todas.length):todas.length);
+    let determinista:{pages:any[];findings:any[]}={pages:[],findings:[]};
+    try{
+     determinista=await ejecutarDeterministaND(buffer,inicio,limitePaginas?Math.min(limitePaginas,todas.length):todas.length);
+    }catch(e:any){
+     console.warn(`      ⚠️ Determinista ND omitido: ${e?.message||e}`);
+    }
     const resultado=procesarDocumentoND(paginas,archivo.nombre,archivo.id,this.neuronId,determinista.findings);
     const porPagina=new Map<number,typeof resultado.hallazgos>();
     for(const h of resultado.hallazgos){const a=porPagina.get(h.evidencia.pagina)||[];a.push(h);porPagina.set(h.evidencia.pagina,a)}
