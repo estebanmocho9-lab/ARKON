@@ -13,6 +13,15 @@ let preparado = false;
 const ahora = () => new Date().toISOString();
 const s = (v: unknown) => v == null ? null : String(v);
 const j = (v: unknown) => { try { return JSON.stringify(v ?? {}); } catch { return '{}'; } };
+const datoSeguro = (h: HallazgoND): string => {
+  const dato = s(h.datoDocumental);
+  if (dato) return dato;
+  const valor = s(h.valorTexto);
+  if (valor) return valor;
+  const aspecto = s(h.aspecto);
+  if (aspecto) return aspecto;
+  return s(h.textoOriginal) ?? '';
+};
 
 export async function prepararEsquemaNDTurso(): Promise<void> {
   if (preparado) return;
@@ -167,18 +176,19 @@ export async function guardarPaginaNDTurso(hallazgos:HallazgoND[], documentoDriv
     const kind=String(h.tipo||'');
     const tabla=PROYECCIONES[kind];
     const m:any=h.metadatos||{};
-    const vals=[k,id,documentoDriveId,neuronId,pagina,h.campo??null,h.entidadCandidata??null,h.entidadPrincipal??null,h.aspecto??null,h.datoDocumental??null,h.textoOriginal,h.textoNormalizado,h.valor??null,h.valorTexto??null,h.unidad??null,h.simbolo??null,h.relacionEntidad??null,h.contexto,h.evidencia?.seccion??null,h.confianza,j(h.evidencia||{}),j(m)];
+    const dato = datoSeguro(h);
+    const vals=[k,id,documentoDriveId,neuronId,pagina,h.campo??null,h.entidadCandidata??null,h.entidadPrincipal??null,h.aspecto??null,dato,h.textoOriginal,h.textoNormalizado,h.valor??null,h.valorTexto??null,h.unidad??null,h.simbolo??null,h.relacionEntidad??null,h.contexto,h.evidencia?.seccion??null,h.confianza,j(h.evidencia||{}),j(m)];
     if(tabla) await turso.execute({sql:`INSERT INTO ${tabla}(clave_unica,hallazgo_id,documento_drive_id,neuron_id,pagina,campo,entidad_candidata,entidad_principal,aspecto,dato_documental,texto,texto_normalizado,valor,valor_texto,unidad,simbolo,relacion_entidad,contexto,seccion,confianza,evidencia_json,metadatos_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_unica) DO UPDATE SET hallazgo_id=excluded.hallazgo_id,confianza=excluded.confianza,metadatos_json=excluded.metadatos_json,evidencia_json=excluded.evidencia_json`,args:vals});
     const unifKey=`${k}¦unif`;
     await turso.execute({sql:`INSERT INTO nd_datos_unificados(clave_unica,documento_drive_id,pagina,tipo,categoria,nombre,nombre_ingles,sinonimos,familia,subfamilia,material,componente,campo,aspecto,dato_documental,valor,valor_texto,unidad,simbolo,condicion,metodo,instrumento,norma,formula,relacion,contexto,seccion,confianza,origen,detalle_json)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_unica) DO UPDATE SET detalle_json=excluded.detalle_json,confianza=excluded.confianza`,args:[unifKey,documentoDriveId,pagina,kind,categoria(kind),h.entidadPrincipal||h.entidadCandidata||h.campo||'',m.english??m.nombre_ingles??null,m.synonyms??m.sinonimos??null,m.family??m.familia??null,m.subfamily??m.subfamilia??null,m.material??null,m.component??m.componente??null,h.campo??null,h.aspecto??null,h.datoDocumental??null,h.valor??null,h.valorTexto??null,h.unidad??null,h.simbolo??null,m.condition??m.condicion??null,m.method??m.metodo??null,m.instrument??m.instrumento??null,m.standard??m.norma??null,m.formula??m.equation??(kind==='FORMULA'?h.textoOriginal:null),m.relation??m.relacion??h.relacionEntidad??null,h.contexto,h.evidencia?.seccion??null,h.confianza,m.origin??m.origen??'ND',j({evidencia:h.evidencia,metadatos:m})]});
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_unica) DO UPDATE SET detalle_json=excluded.detalle_json,confianza=excluded.confianza`,args:[unifKey,documentoDriveId,pagina,kind,categoria(kind),h.entidadPrincipal||h.entidadCandidata||h.campo||'',m.english??m.nombre_ingles??null,m.synonyms??m.sinonimos??null,m.family??m.familia??null,m.subfamily??m.subfamilia??null,m.material??null,m.component??m.componente??null,h.campo??null,h.aspecto??null,dato,h.valor??null,h.valorTexto??null,h.unidad??null,h.simbolo??null,m.condition??m.condicion??null,m.method??m.metodo??null,m.instrument??m.instrumento??null,m.standard??m.norma??null,m.formula??m.equation??(kind==='FORMULA'?h.textoOriginal:null),m.relation??m.relacion??h.relacionEntidad??null,h.contexto,h.evidencia?.seccion??null,h.confianza,m.origin??m.origen??'ND',j({evidencia:h.evidencia,metadatos:m})]});
     if(h.entidadPrincipal||h.entidadCandidata){
       const entidad=String(h.entidadPrincipal||h.entidadCandidata);
       const ck=`${documentoDriveId}¦${entidad.toLowerCase()}`;
       await turso.execute({sql:`INSERT INTO nd_entidades_documentales(documento_drive_id,neuron_id,tipo,entidad,clave_entidad,primera_pagina,ultima_pagina,descripcion,metadata_json) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_entidad) DO UPDATE SET ultima_pagina=CASE WHEN excluded.ultima_pagina>nd_entidades_documentales.ultima_pagina THEN excluded.ultima_pagina ELSE nd_entidades_documentales.ultima_pagina END,metadata_json=excluded.metadata_json`,args:[documentoDriveId,neuronId,kind,entidad,ck,pagina,pagina,null,j(m)]});
-      await turso.execute({sql:`INSERT INTO nd_datos_entidad(clave_unica,clave_entidad,documento_drive_id,pagina,aspecto,dato_documental,valor,valor_texto,unidad,relacion_entidad,evidencia_json,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_unica) DO UPDATE SET evidencia_json=excluded.evidencia_json,metadata_json=excluded.metadata_json`,args:[`${k}¦ent`,ck,documentoDriveId,pagina,h.aspecto??null,h.datoDocumental??null,h.valor??null,h.valorTexto??null,h.unidad??null,h.relacionEntidad??null,j(h.evidencia||{}),j(m)]});
+      await turso.execute({sql:`INSERT INTO nd_datos_entidad(clave_unica,clave_entidad,documento_drive_id,pagina,aspecto,dato_documental,valor,valor_texto,unidad,relacion_entidad,evidencia_json,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(clave_unica) DO UPDATE SET evidencia_json=excluded.evidencia_json,metadata_json=excluded.metadata_json`,args:[`${k}¦ent`,ck,documentoDriveId,pagina,h.aspecto??null,dato,h.valor??null,h.valorTexto??null,h.unidad??null,h.relacionEntidad??null,j(h.evidencia||{}),j(m)]});
     }
-    const partes=[h.textoOriginal,h.contexto,h.datoDocumental].filter(Boolean) as string[];
+    const partes=[h.textoOriginal,h.contexto,dato].filter(Boolean) as string[];
     for(const campo of partes){
       const max=45000;
       const total=Math.max(1,Math.ceil(campo.length/max));
