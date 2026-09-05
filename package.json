@@ -27,6 +27,7 @@
     "extraer:nd:01": "ts-node --transpile-only src/extraction-neurons/runND.ts 01",
     "extraer:nd:02": "ts-node --transpile-only src/extraction-neurons/runND.ts 02",
     "extraer:nd:todas": "ts-node --transpile-only src/extraction-neurons/runND.ts todas",
+    "extraer:nd:test": "ts-node --transpile-only src/extraction-neurons/runND.ts 01 1 5",
     "definir:01": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 01",
     "definir:02": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 02",
     "definir:03": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 03",
