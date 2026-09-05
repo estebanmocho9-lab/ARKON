@@ -35,7 +35,6 @@ export abstract class NeuronNDBaseSheetsV2{
    try{buffer=await descargarArchivo(archivo.id)}catch(e:any){console.error(`      ❌ Drive: ${e?.message||e}`);continue}
    const inicio=FORZAR_REANALISIS||limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
    try{
-    // Cada PDF recibe una spreadsheet ND independiente. Nunca se reutiliza una hoja global.
     resetNDSpreadsheet();
     resetSheetsNDContext();
     const spreadsheetId=await crearSpreadsheetND(archivo.nombre);
@@ -65,7 +64,8 @@ export abstract class NeuronNDBaseSheetsV2{
      const hs=porPagina.get(pagina.pagina)||[];
      const cap=detectarCapitulo(pagina.texto||'');
      for(const h of hs){h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,motor:'ND-comprension-bloques-5extractores-determinista-16RAM'};if(cap)h.evidencia.seccion=cap}
-     const n=await guardarPaginaNDSheets(hs,archivo.id,archivo.nombre,this.neuronId,this.numeroCarpeta,pagina.pagina);
+     const paginaDeterminista=determinista.pages.find((p:any)=>Number(p.page??p.pagina)===pagina.pagina);
+     const n=await guardarPaginaNDSheets(hs,archivo.id,archivo.nombre,this.neuronId,this.numeroCarpeta,pagina.pagina,paginaDeterminista);
      guardados+=n;procesadas++;last=pagina.pagina;
      cp.documentoEnProgreso={driveFileId:archivo.id,ultimaPaginaCompletada:last};this.guardar(cp);
      console.log(`      📄 ${pagina.pagina}/${todas.length} → ${n} hallazgos`);
