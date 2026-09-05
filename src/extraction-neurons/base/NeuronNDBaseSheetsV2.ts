@@ -8,13 +8,7 @@ import * as path from 'path';
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from '../drive/driveReader';
 import { procesarPaginasIncremental, detectarCapitulo } from '../pdf/pdfParser';
 import { extraerNDCompleto } from './extractorNDCompleto';
-import {
-  prepararSheetsND,
-  paginaYaProcesadaNDSheets,
-  registrarDocumentoNDSheets,
-  guardarPaginaNDSheets,
-  finalizarDocumentoNDSheets,
-} from '../sheets/ndSheetsPersistence';
+import { prepararSheetsND, paginaYaProcesadaNDSheets, registrarDocumentoNDSheets, guardarPaginaNDSheets, finalizarDocumentoNDSheets } from '../sheets/ndSheetsPersistence';
 
 const CARPETA_CHECKPOINTS = path.join(process.cwd(), 'checkpoints');
 interface CheckpointND { documentosCompletos: string[]; documentoEnProgreso?: { driveFileId: string; ultimaPaginaCompletada: number } }
@@ -40,9 +34,7 @@ export abstract class NeuronNDBaseSheetsV2 {
     return JSON.parse(fs.readFileSync(r, 'utf8'));
   }
 
-  private guardarCheckpoint(cp: CheckpointND) {
-    fs.writeFileSync(this.rutaCheckpoint(), JSON.stringify(cp, null, 2), 'utf8');
-  }
+  private guardarCheckpoint(cp: CheckpointND) { fs.writeFileSync(this.rutaCheckpoint(), JSON.stringify(cp, null, 2), 'utf8'); }
 
   async ejecutar(limiteDocumentos?: number, limitePaginas?: number): Promise<void> {
     console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
@@ -62,60 +54,45 @@ export abstract class NeuronNDBaseSheetsV2 {
       console.log(`\n   📖 ${archivo.nombre}`);
       let buffer: Buffer;
       try {
-        // Se mantiene el flujo existente: el PDF se lee desde Drive y se mantiene
-        // en memoria para el parser; no se crea ningún archivo PDF local.
+        // Drive -> memoria. No se crea ningún archivo PDF local.
         buffer = await descargarArchivo(archivo.id);
       } catch (err: any) {
         console.error(`      ❌ Lectura Drive: ${err?.message || err}`);
         continue;
       }
 
-      const paginaInicial = limitePaginas
-        ? 1
-        : (checkpoint.documentoEnProgreso?.driveFileId === archivo.id
-          ? checkpoint.documentoEnProgreso.ultimaPaginaCompletada + 1
-          : 1);
+      const paginaInicial = limitePaginas ? 1 : (checkpoint.documentoEnProgreso?.driveFileId === archivo.id ? checkpoint.documentoEnProgreso.ultimaPaginaCompletada + 1 : 1);
 
       try {
         await registrarDocumentoNDSheets({ documentoDriveId: archivo.id, nombre: archivo.nombre, neuronId: this.neuronId, carpetaDrive: this.numeroCarpeta });
+        let totalPaginas = 0, totalGuardados = 0, paginasCorrida = 0, totalTexto = 0, ultimaPagina = paginaInicial - 1;
 
-        let totalPaginas = 0;
-        let totalGuardados = 0;
-        let paginasCorrida = 0;
-        let totalTexto = 0;
-        let ultimaPagina = paginaInicial - 1;
+        totalPaginas = await procesarPaginasIncremental(buffer, async ({ pagina, texto }, total) => {
+          if (limitePaginas && paginasCorrida >= limitePaginas) return;
+          totalPaginas = total;
+          if (limitePaginas && pagina > limitePaginas) return;
+          if (!limitePaginas && await paginaYaProcesadaNDSheets(archivo.id, this.neuronId, pagina)) return;
 
-        totalPaginas = await procesarPaginasIncremental(
-          buffer,
-          async ({ pagina, texto }, total) => {
-            if (limitePaginas && paginasCorrida >= limitePaginas) return;
-            totalPaginas = total;
-            if (limitePaginas && pagina > limitePaginas) return;
-            if (!limitePaginas && await paginaYaProcesadaNDSheets(archivo.id, this.neuronId, pagina)) return;
+          paginasCorrida++;
+          ultimaPagina = pagina;
+          totalTexto += texto.trim().length;
 
-            paginasCorrida++;
-            ultimaPagina = pagina;
-            totalTexto += texto.trim().length;
-
-            let hallazgos: ReturnType<typeof extraerNDCompleto> = [];
-            if (texto && texto.trim().length >= 20) {
-              const capitulo = detectarCapitulo(texto);
-              hallazgos = extraerNDCompleto(texto, pagina, archivo.nombre, this.neuronId);
-              for (const h of hallazgos) {
-                h.metadatos = { ...(h.metadatos || {}), documentoDriveId: archivo.id, carpetaDrive: this.numeroCarpeta, ...(capitulo ? { capitulo } : {}) };
-                if (capitulo) h.evidencia.seccion = capitulo;
-              }
+          let hallazgos: ReturnType<typeof extraerNDCompleto> = [];
+          if (texto && texto.trim().length >= 20) {
+            const capitulo = detectarCapitulo(texto);
+            hallazgos = extraerNDCompleto(texto, pagina, archivo.nombre, this.neuronId);
+            for (const h of hallazgos) {
+              h.metadatos = { ...(h.metadatos || {}), documentoDriveId: archivo.id, carpetaDrive: this.numeroCarpeta, ...(capitulo ? { capitulo } : {}) };
+              if (capitulo) h.evidencia.seccion = capitulo;
             }
+          }
 
-            const guardados = await guardarPaginaNDSheets(hallazgos, archivo.id, pagina === undefined ? archivo.nombre : archivo.nombre, this.neuronId, this.numeroCarpeta, pagina);
-            totalGuardados += guardados;
-            checkpoint.documentoEnProgreso = { driveFileId: archivo.id, ultimaPaginaCompletada: pagina };
-            this.guardarCheckpoint(checkpoint);
-            console.log(`      📄 ${pagina}/${total} → ${guardados}`);
-          },
-          paginaInicial,
-          limitePaginas,
-        );
+          const guardados = await guardarPaginaNDSheets(hallazgos, archivo.id, archivo.nombre, this.neuronId, this.numeroCarpeta, pagina);
+          totalGuardados += guardados;
+          checkpoint.documentoEnProgreso = { driveFileId: archivo.id, ultimaPaginaCompletada: pagina };
+          this.guardarCheckpoint(checkpoint);
+          console.log(`      📄 ${pagina}/${total} → ${guardados}`);
+        }, paginaInicial, limitePaginas);
 
         const completo = ultimaPagina >= totalPaginas && totalPaginas > 0;
         if (completo) {
@@ -133,9 +110,7 @@ export abstract class NeuronNDBaseSheetsV2 {
       } catch (err: any) {
         console.error(`      ❌ Procesamiento interrumpido: ${err?.message || err}`);
         console.log('      ↩️ Se conserva el checkpoint para reanudar.');
-      } finally {
-        buffer = Buffer.alloc(0);
-      }
+      } finally { buffer = Buffer.alloc(0); }
     }
 
     console.log(`\n🏁 ${this.neuronId}: ${procesados} documentos procesados en esta corrida.`);
