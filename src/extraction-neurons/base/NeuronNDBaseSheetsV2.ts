@@ -17,15 +17,15 @@ export abstract class NeuronNDBaseSheetsV2{
  private guardar(c:CheckpointND){fs.writeFileSync(this.ruta(),JSON.stringify(c,null,2),'utf8')}
  protected obtenerCarpetaMadreId(){const id=process.env.CARPETA_MADRE_DRIVE_ID;if(!id)throw new Error('Falta CARPETA_MADRE_DRIVE_ID en el .env');return extraerIdCarpeta(id)}
 
- async ejecutar(limiteDocumentos?:number,limitePaginas?:number):Promise<void>{
+ async ejecutar(limiteDocumentos?:number,limitePaginas?:number,nombreObjetivo?:string):Promise<void>{
   console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
   await prepararSheetsND();
   const cp=this.cargar();
   const carpeta=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
-  const archivos=await listarPDFs(carpeta);
+  let archivos=await listarPDFs(carpeta);
+  if(nombreObjetivo)archivos=archivos.filter(a=>a.nombre===nombreObjetivo);
   console.log(`   📚 ${archivos.length} PDFs encontrados`);
   let hechos=0;
-
   for(const archivo of archivos){
    if(limiteDocumentos&&hechos>=limiteDocumentos)break;
    if(!limitePaginas&&cp.documentosCompletos.includes(archivo.id))continue;
@@ -35,18 +35,14 @@ export abstract class NeuronNDBaseSheetsV2{
    const inicio=limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
    try{
     await registrarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta});
-
-    // El PDF completo queda en memoria. La comprensión ve el documento entero
-    // y la persistencia continúa página por página.
     const todas=await extraerPaginas(buffer);
     const seleccion=limitePaginas?todas.slice(0,limitePaginas):todas;
     const paginas:PaginaND[]=[];let off=0;
     for(const x of todas){const t=x.texto||'';paginas.push({pagina:x.pagina,texto:t,inicio:off,fin:off+t.length});off+=t.length+2}
-    const determinista=await ejecutarDeterministaND(buffer, inicio, limitePaginas?Math.min(limitePaginas,todas.length):todas.length);
+    const determinista=await ejecutarDeterministaND(buffer,inicio,limitePaginas?Math.min(limitePaginas,todas.length):todas.length);
     const resultado=procesarDocumentoND(paginas,archivo.nombre,archivo.id,this.neuronId,determinista.findings);
     const porPagina=new Map<number,typeof resultado.hallazgos>();
     for(const h of resultado.hallazgos){const a=porPagina.get(h.evidencia.pagina)||[];a.push(h);porPagina.set(h.evidencia.pagina,a)}
-
     let guardados=0,procesadas=0,last=inicio-1;
     for(const pagina of seleccion){
      if(pagina.pagina<inicio)continue;
