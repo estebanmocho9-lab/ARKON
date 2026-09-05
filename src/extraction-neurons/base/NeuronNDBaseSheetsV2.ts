@@ -8,6 +8,8 @@ import { procesarDocumentoND, PaginaND } from './procesadorDocumentoND';
 
 const CHECKPOINTS=path.join(process.cwd(),'checkpoints');
 const FORZAR_REANALISIS=process.env.ND_REANALIZAR==='1';
+const DESDE_PAGINA=Number(process.env.ND_DESDE_PAGINA||'1');
+const HASTA_PAGINA=Number(process.env.ND_HASTA_PAGINA||'0');
 interface CheckpointND{documentosCompletos:string[];documentoEnProgreso?:{driveFileId:string;ultimaPaginaCompletada:number}}
 
 export abstract class NeuronNDBaseSheetsV2{
@@ -42,8 +44,11 @@ export abstract class NeuronNDBaseSheetsV2{
    let ejecucionId:number|undefined;
    try{
     const todas=await extraerPaginas(buffer);
-    const seleccion=limitePaginas?todas.slice(0,limitePaginas):todas;
-    console.log(`      📑 ${todas.length} páginas detectadas. Inicio: página ${inicio}.`);
+    const desde=Math.max(1,DESDE_PAGINA);
+    const hasta=HASTA_PAGINA>0?Math.min(HASTA_PAGINA,todas.length):todas.length;
+    if(desde>hasta)throw new Error(`Rango de páginas inválido: ${desde}-${hasta}.`);
+    const seleccion=limitePaginas?todas.slice(0,limitePaginas).filter((p:any)=>p.pagina>=desde&&p.pagina<=hasta):todas.filter((p:any)=>p.pagina>=desde&&p.pagina<=hasta);
+    console.log(`      📑 ${todas.length} páginas detectadas. Tanda: páginas ${desde}-${hasta}.`);
 
     ejecucionId=await iniciarDocumentoNDTurso({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length});
     console.log(`      💾 Turso: documento iniciado (ejecución ${ejecucionId})`);
@@ -54,8 +59,6 @@ export abstract class NeuronNDBaseSheetsV2{
      if(limitePaginas&&pagina.pagina>limitePaginas)break;
      if(!FORZAR_REANALISIS&&!limitePaginas&&await paginaYaProcesadaNDTurso(archivo.id,pagina.pagina))continue;
 
-     // Cada página se extrae, fusiona y persiste inmediatamente.
-     // No se acumula el documento completo antes de escribir en Turso.
      const texto=pagina.texto||'';
      const paginaND:PaginaND={pagina:pagina.pagina,texto,inicio:0,fin:texto.length};
      let deterministaPagina:{pages:any[];findings:any[]}={pages:[],findings:[]};
@@ -81,7 +84,7 @@ export abstract class NeuronNDBaseSheetsV2{
      console.log(`      📄 ${pagina.pagina}/${todas.length} → ${n} hallazgos guardados en Turso`);
     }
 
-    const completo=!limitePaginas&&last>=todas.length&&todas.length>0;
+    const completo=desde===1&&hasta===todas.length&&!limitePaginas&&last>=todas.length&&todas.length>0;
     if(completo){
      await finalizarDocumentoNDTurso({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length,paginasProcesadas:procesadas,hallazgosTotal:guardados,ejecucionId});
      cp.documentosCompletos=[...cp.documentosCompletos.filter(id=>id!==archivo.id),archivo.id];
