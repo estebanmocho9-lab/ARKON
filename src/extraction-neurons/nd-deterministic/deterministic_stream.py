@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, re, sys, math, fitz
+import json, re, sys, math, pymupdf
 
 UNITS=r"(?:mm|cm|m|km|µm|um|nm|kg|g|mg|N|kN|Pa|kPa|MPa|GPa|psi|bar|°C|°F|K|J|kJ|W|kW|V|A|Hz|s|ms|min|h|%|pH|g/cm³|kg/m³|kg/m3|g/cm3|kN/m²|kN/m2)"
 VALUE_RE=re.compile(r"[-+]?\d+(?:[.,]\d+)?(?:\s*[×x]\s*10\s*[-^]?\s*\d+)?\s*(?:"+UNITS+r")?",re.I)
@@ -30,8 +30,19 @@ def num(s):
 def add(out,kind,field,entity,aspect,data,original,pno,section,bbox,conf,value=None,unit='',context='',source='deterministic'):
  out.append({'kind':kind,'field':field,'entity':entity or original,'aspect':aspect or field,'documentaryData':data or original,'originalText':original,'normalizedText':re.sub(r'\s+',' ',original).strip(),'value':value,'valueText':original,'unit':unit,'symbol':'','context':context or original,'page':pno,'section':section,'confidence':conf,'evidence':{'fragment':original,'page':pno,'section':section,'start':bbox[0],'end':bbox[2]},'metadata':{'source':source,'bbox':bbox}})
 
+def jsonable_link(link):
+ out={}
+ for k,v in link.items():
+  if hasattr(v,'x0') and hasattr(v,'y0'):
+   out[k]=[float(v.x0),float(v.y0),float(v.x1),float(v.y1)]
+  elif isinstance(v,(str,int,float,bool)) or v is None:
+   out[k]=v
+  else:
+   out[k]=str(v)
+ return out
+
 def extract(pdf,start,end):
- doc=fitz.open(stream=pdf,filetype='pdf'); findings=[]; pages=[]; current_section=''
+ doc=pymupdf.open(stream=pdf,filetype='pdf'); findings=[]; pages=[]; current_section=''
  for i in range(start-1,min(end,len(doc))):
   page=doc[i]; words=[]
   for w in page.get_text('words'):
@@ -68,7 +79,7 @@ def extract(pdf,start,end):
    for m in FORMULA_RE.finditer(line):
     raw=m.group(0).strip()
     add(findings,'FORMULA','formula',line[max(0,m.start()-70):m.start()].strip(),'expresion',raw,raw,i+1,current_section,bbox,.90,context=line,source='formula_regex')
-  pages.append({'page':i+1,'text':text,'bbox':[0,0,page.rect.width,page.rect.height],'words':words,'blocks':blocks,'headings':heads,'tables':[],'links':page.get_links(),'images':len(page.get_images(full=True))})
+  pages.append({'page':i+1,'text':text,'bbox':[0,0,float(page.rect.width),float(page.rect.height)],'words':words,'blocks':blocks,'headings':heads,'tables':[],'links':[jsonable_link(x) for x in page.get_links()],'images':len(page.get_images(full=True))})
  doc.close()
  seen=set(); clean=[]
  for f in findings:
