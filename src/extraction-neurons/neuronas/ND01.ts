@@ -1,7 +1,7 @@
 // src/extraction-neurons/neuronas/ND01.ts
-import { NeuronNDBaseV2 } from '../base/NeuronNDBaseV2';
+import { NeuronNDBaseSheetsV2 } from '../base/NeuronNDBaseSheetsV2';
 
-export class ND01 extends NeuronNDBaseV2 {
+export class ND01 extends NeuronNDBaseSheetsV2 {
   readonly neuronId = 'ND-01';
   readonly numeroCarpeta = '01';
 }
