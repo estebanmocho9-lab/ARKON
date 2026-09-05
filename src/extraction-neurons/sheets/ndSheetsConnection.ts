@@ -4,19 +4,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // ND usa exclusivamente la cuenta de usuario activa de gcloud para el destino.
-// No depende de OAuth client_secret, refresh token ni de credenciales de NE.
-// credentials.json continúa reservado para lectura de Drive/origen.
-const auth = {
-  getRequestHeaders: async () => ({
-    Authorization: `Bearer ${execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8' }).trim()}`,
-  }),
-} as any;
+// Se construye un OAuth2Client real porque googleapis necesita authClient.request().
+// No depende de client_secret ni refresh token del proyecto.
+const auth = new google.auth.OAuth2();
+function cargarTokenGcloud(){
+  const token=execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8' }).trim();
+  if(!token)throw new Error('gcloud no devolvió un access token. Ejecutá: gcloud auth login');
+  auth.setCredentials({access_token:token});
+}
 export const sheets = google.sheets({version:'v4',auth});
 let SPREADSHEET_ID=process.env.ND_GOOGLE_SHEETS_ID||'';
 const ID_FILE=path.join(process.cwd(),'checkpoints','ND_GOOGLE_SHEETS_ID');
 function leerId(){try{return fs.existsSync(ID_FILE)?fs.readFileSync(ID_FILE,'utf8').trim():''}catch{return ''}}
 function guardarId(id:string){const d=path.dirname(ID_FILE);if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.writeFileSync(ID_FILE,id+'\n','utf8')}
 export async function prepararConexionSheetsND():Promise<string>{
+ cargarTokenGcloud();
  if(SPREADSHEET_ID){console.log(`   📊 ND -> Google Sheets existente: ${SPREADSHEET_ID}`);return SPREADSHEET_ID;}
  SPREADSHEET_ID=leerId();if(SPREADSHEET_ID){console.log(`   📊 ND -> Google Sheets existente: ${SPREADSHEET_ID}`);return SPREADSHEET_ID}
  const drive=google.drive({version:'v3',auth});
