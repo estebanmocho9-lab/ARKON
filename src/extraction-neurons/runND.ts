@@ -25,8 +25,10 @@ const NEURONAS: Record<string, () => NeuronNDBaseSheetsV2> = {
 async function main() {
   const objetivo = process.argv[2] || '01';
   const limiteDocumentos = process.argv[3] ? Number(process.argv[3]) : undefined;
-  const limitePaginas = process.argv[4] ? Number(process.argv[4]) : undefined;
-  const nombreObjetivo = process.argv[5] || undefined;
+  const rawLimitePaginas = process.argv[4];
+  // '-' significa sin límite de páginas; permite especificar el nombre del PDF como quinto argumento.
+  const limitePaginas = rawLimitePaginas && rawLimitePaginas !== '-' ? Number(rawLimitePaginas) : undefined;
+  const nombreObjetivo = process.argv[5]?.trim() || undefined;
   if (limiteDocumentos !== undefined && (!Number.isInteger(limiteDocumentos) || limiteDocumentos < 1)) throw new Error('El límite de documentos debe ser un entero positivo.');
   if (limitePaginas !== undefined && (!Number.isInteger(limitePaginas) || limitePaginas < 1)) throw new Error('El límite de páginas debe ser un entero positivo.');
 
