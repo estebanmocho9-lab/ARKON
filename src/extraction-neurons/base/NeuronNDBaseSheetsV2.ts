@@ -24,7 +24,10 @@ export abstract class NeuronNDBaseSheetsV2{
   const cp=this.cargar();
   const carpeta=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
   let archivos=await listarPDFs(carpeta);
-  if(nombreObjetivo)archivos=archivos.filter(a=>a.nombre===nombreObjetivo);
+  if(nombreObjetivo){
+   const objetivoNormalizado=nombreObjetivo.replace(/^\(\d+\)/,'').trim().toLowerCase();
+   archivos=archivos.filter(a=>a.nombre===nombreObjetivo||a.nombre.replace(/^\(\d+\)/,'').trim().toLowerCase()===objetivoNormalizado);
+  }
   console.log(`   📚 ${archivos.length} PDFs objetivo encontrados${nombreObjetivo?` → ${nombreObjetivo}`:''}`);
   let hechos=0;
 
