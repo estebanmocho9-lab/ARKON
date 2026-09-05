@@ -16,7 +16,6 @@ import { ND07 } from './neuronas/ND07';
 import { ND08 } from './neuronas/ND08';
 import { ND09 } from './neuronas/ND09';
 import { ND10 } from './neuronas/ND10';
-import { prepararSheetsND } from './sheets/ndSheetsPersistence';
 
 const NEURONAS: Record<string, () => NeuronNDBaseSheetsV2> = {
   '01': () => new ND01(), '02': () => new ND02(), '03': () => new ND03(), '04': () => new ND04(), '05': () => new ND05(),
@@ -39,8 +38,8 @@ async function main() {
   console.log(' Supabase:     DESCONECTADO');
   console.log(' NE:           NO EJECUTADA');
   console.log('============================================================');
+  console.log(' ℹ️  Las spreadsheets ND se crean dentro del flujo de cada PDF.');
 
-  await prepararSheetsND();
   const ids = objetivo === 'todas' ? Object.keys(NEURONAS) : [objetivo.padStart(2, '0')];
   for (const id of ids) {
     const crear = NEURONAS[id];
