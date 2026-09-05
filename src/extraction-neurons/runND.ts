@@ -1,6 +1,7 @@
 // ============================================================
 // runND.ts — runner EXCLUSIVO de las neuronas documentales ND.
-// No importa ni ejecuta NE, Supabase ni propiedades_extraidas.
+// Drive -> PDF -> ND-01...ND-10 -> Google Sheets.
+// No ejecuta NE, Supabase ni Turso.
 //
 // Uso:
 //   npx ts-node --transpile-only src/extraction-neurons/runND.ts 01
@@ -19,7 +20,7 @@ import { ND07 } from './neuronas/ND07';
 import { ND08 } from './neuronas/ND08';
 import { ND09 } from './neuronas/ND09';
 import { ND10 } from './neuronas/ND10';
-import { prepararEsquemaND } from '../turso/esquemaND';
+import { prepararSheetsND } from './sheets/ndSheetsPersistence';
 
 const NEURONAS: Record<string, () => { ejecutar: (limiteDocumentos?: number, limitePaginas?: number) => Promise<void> }> = {
   '01': () => new ND01(), '02': () => new ND02(), '03': () => new ND03(), '04': () => new ND04(), '05': () => new ND05(),
@@ -33,7 +34,16 @@ async function main() {
   if (limiteDocumentos !== undefined && (!Number.isInteger(limiteDocumentos) || limiteDocumentos < 1)) throw new Error('El límite de documentos debe ser un entero positivo.');
   if (limitePaginas !== undefined && (!Number.isInteger(limitePaginas) || limitePaginas < 1)) throw new Error('El límite de páginas debe ser un entero positivo.');
 
-  await prepararEsquemaND();
+  console.log('\n============================================================');
+  console.log(' ARKON — EXTRACCION ND');
+  console.log('============================================================');
+  console.log(' Persistencia: GOOGLE SHEETS');
+  console.log(' Turso:        DESCONECTADO');
+  console.log(' Supabase:     DESCONECTADO');
+  console.log(' NE:           NO EJECUTADA');
+  console.log('============================================================');
+
+  await prepararSheetsND();
   const ids = objetivo === 'todas' ? Object.keys(NEURONAS) : [objetivo.padStart(2, '0')];
   for (const id of ids) {
     const crear = NEURONAS[id];
@@ -41,7 +51,9 @@ async function main() {
     await crear().ejecutar(limiteDocumentos, limitePaginas);
   }
   console.log('\n🏁 ND finalizada.');
-  console.log('   Persistencia: Turso únicamente.');
-  console.log('   NE-01...NE-10 no fueron ejecutadas.');
+  console.log('   💾 Destino: Google Sheets.');
+  console.log('   🚫 Turso no participa.');
+  console.log('   🚫 Supabase no participa.');
+  console.log('   🚫 NE-01...NE-10 no fueron ejecutadas.');
 }
 main().catch(err => { console.error('❌ ND:', err?.message || err); process.exit(1); });
