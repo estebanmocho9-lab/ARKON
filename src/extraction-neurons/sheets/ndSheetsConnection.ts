@@ -6,10 +6,11 @@ import * as path from 'path';
 // ND usa exclusivamente la cuenta de usuario activa de gcloud para el destino.
 // No depende de OAuth client_secret, refresh token ni de credenciales de NE.
 // credentials.json continúa reservado para lectura de Drive/origen.
-const auth = new google.auth.AuthClient();
-(auth as any).getRequestHeaders = async () => ({
-  Authorization: `Bearer ${execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8' }).trim()}`,
-});
+const auth = {
+  getRequestHeaders: async () => ({
+    Authorization: `Bearer ${execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8' }).trim()}`,
+  }),
+} as any;
 export const sheets = google.sheets({version:'v4',auth});
 let SPREADSHEET_ID=process.env.ND_GOOGLE_SHEETS_ID||'';
 const ID_FILE=path.join(process.cwd(),'checkpoints','ND_GOOGLE_SHEETS_ID');
