@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from '../drive/driveReader';
 import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';
-import { prepararSheetsND, paginaYaProcesadaNDSheets, registrarDocumentoNDSheets, guardarPaginaNDSheets, finalizarDocumentoNDSheets } from '../sheets/ndSheetsPersistence';
+import { prepararSheetsND, paginaYaProcesadaNDSheets, registrarDocumentoNDSheets, guardarPaginaNDSheets, finalizarDocumentoNDSheets, resetSheetsNDContext } from '../sheets/ndSheetsPersistence';
+import { crearSpreadsheetND, resetNDSpreadsheet } from '../sheets/ndSheetsConnection';
 import { ejecutarDeterministaND } from '../nd-deterministic/runDeterministicND';
 import { procesarDocumentoND, PaginaND } from './procesadorDocumentoND';
 
@@ -20,7 +21,6 @@ export abstract class NeuronNDBaseSheetsV2{
 
  async ejecutar(limiteDocumentos?:number,limitePaginas?:number,nombreObjetivo?:string):Promise<void>{
   console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
-  await prepararSheetsND();
   const cp=this.cargar();
   const carpeta=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
   let archivos=await listarPDFs(carpeta);
@@ -35,7 +35,12 @@ export abstract class NeuronNDBaseSheetsV2{
    try{buffer=await descargarArchivo(archivo.id)}catch(e:any){console.error(`      ❌ Drive: ${e?.message||e}`);continue}
    const inicio=FORZAR_REANALISIS||limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
    try{
-    await registrarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta});
+    // Cada PDF recibe una spreadsheet ND independiente. Nunca se reutiliza una hoja global.
+    resetNDSpreadsheet();
+    resetSheetsNDContext();
+    const spreadsheetId=await crearSpreadsheetND(archivo.nombre);
+    await prepararSheetsND();
+    console.log(`      💾 Resultado ND de este PDF: ${spreadsheetId}`);
     const todas=await extraerPaginas(buffer);
     const seleccion=limitePaginas?todas.slice(0,limitePaginas):todas;
     const paginas:PaginaND[]=[];let off=0;
@@ -49,6 +54,7 @@ export abstract class NeuronNDBaseSheetsV2{
     }
     const resultado=procesarDocumentoND(paginas,archivo.nombre,archivo.id,this.neuronId,determinista.findings);
     console.log(`      🧠 ND fusionado: ${resultado.hallazgos.length} hallazgos`);
+    await registrarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length});
     const porPagina=new Map<number,typeof resultado.hallazgos>();
     for(const h of resultado.hallazgos){const a=porPagina.get(h.evidencia.pagina)||[];a.push(h);porPagina.set(h.evidencia.pagina,a)}
     let guardados=0,procesadas=0,last=inicio-1;
