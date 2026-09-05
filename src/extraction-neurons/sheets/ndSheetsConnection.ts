@@ -2,74 +2,54 @@ import { google } from 'googleapis';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ND usa la misma credencial de servicio que el lector de Drive.
-// Esto evita depender de Application Default Credentials (ADC) del usuario
-// de Cloud Shell y, por lo tanto, evita errores de quota project.
+// ND crea una spreadsheet independiente por cada PDF.
+// La misma cuenta de servicio que lee Drive crea y escribe el resultado.
 const credentialsPath = path.join(process.cwd(), 'credentials.json');
-if (!fs.existsSync(credentialsPath)) {
-  throw new Error('No se encontró credentials.json en la raíz del proyecto');
-}
+if (!fs.existsSync(credentialsPath)) throw new Error('No se encontró credentials.json en la raíz del proyecto');
 const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
 
 const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: credentials.client_email,
-    private_key: credentials.private_key,
-  },
-  scopes: [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive',
-  ],
+  credentials: { client_email: credentials.client_email, private_key: credentials.private_key },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'],
 });
 
 export const sheets = google.sheets({ version: 'v4', auth });
+export const drive = google.drive({ version: 'v3', auth });
 
-let SPREADSHEET_ID = process.env.ND_GOOGLE_SHEETS_ID || '';
-const ID_FILE = path.join(process.cwd(), 'checkpoints', 'ND_GOOGLE_SHEETS_ID');
+let spreadsheetId = '';
 
-function leerId(): string {
-  try {
-    return fs.existsSync(ID_FILE) ? fs.readFileSync(ID_FILE, 'utf8').trim() : '';
-  } catch {
-    return '';
-  }
-}
-
-function guardarId(id: string): void {
-  const d = path.dirname(ID_FILE);
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-  fs.writeFileSync(ID_FILE, id + '\n', 'utf8');
+export function setNDSpreadsheetId(id: string): void { spreadsheetId = id; }
+export function resetNDSpreadsheet(): void { spreadsheetId = ''; }
+export function getNDSpreadsheetId(): string {
+  if (!spreadsheetId) throw new Error('Sheets ND no preparado para el documento actual.');
+  return spreadsheetId;
 }
 
 export async function prepararConexionSheetsND(): Promise<string> {
-  if (SPREADSHEET_ID) {
-    console.log(`   📊 ND -> Google Sheets existente: ${SPREADSHEET_ID}`);
-    return SPREADSHEET_ID;
-  }
-
-  SPREADSHEET_ID = leerId();
-  if (SPREADSHEET_ID) {
-    console.log(`   📊 ND -> Google Sheets existente: ${SPREADSHEET_ID}`);
-    return SPREADSHEET_ID;
-  }
-
-  const drive = google.drive({ version: 'v3', auth });
-  const about = await drive.about.get({ fields: 'user(emailAddress)' });
-  console.log(`   👤 ND Sheets autenticado como: ${about.data.user?.emailAddress || credentials.client_email}`);
-
-  const creado = await sheets.spreadsheets.create({
-    requestBody: { properties: { title: 'ARKON ND - Extracción' } },
-  });
-  const id = creado.data.spreadsheetId;
-  if (!id) throw new Error('Google Sheets no devolvió spreadsheetId.');
-
-  SPREADSHEET_ID = id;
-  guardarId(id);
-  console.log(`   🆕 Hoja ND creada: ${id}`);
-  return id;
+  return getNDSpreadsheetId();
 }
 
-export function getNDSpreadsheetId(): string {
-  if (!SPREADSHEET_ID) throw new Error('Sheets ND no preparado.');
-  return SPREADSHEET_ID;
+export async function crearSpreadsheetND(nombreDocumento: string): Promise<string> {
+  const requestBody: any = { properties: { title: `ARKON_ND_${nombreDocumento}` } };
+  // Si se configura ND_SHEETS_FOLDER_ID, la spreadsheet se crea directamente
+  // en esa carpeta de Drive (por ejemplo, una carpeta compartida de SM).
+  const folderId = process.env.ND_SHEETS_FOLDER_ID?.trim();
+  if (folderId) requestBody.parents = [folderId];
+
+  const creado = await drive.files.create({
+    requestBody: {
+      name: requestBody.properties.title,
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      ...(folderId ? { parents: [folderId] } : {}),
+    },
+    fields: 'id,name,parents',
+    supportsAllDrives: true,
+  });
+  const id = creado.data.id;
+  if (!id) throw new Error('Google Drive no devolvió el ID de la spreadsheet ND.');
+  setNDSpreadsheetId(id);
+  console.log(`   🆕 Spreadsheet ND creada: ${creado.data.name || requestBody.properties.title}`);
+  console.log(`   🔗 Spreadsheet ID: ${id}`);
+  if (folderId) console.log(`   📁 Carpeta Sheets ND: ${folderId}`);
+  return id;
 }
