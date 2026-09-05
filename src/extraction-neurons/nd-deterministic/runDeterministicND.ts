@@ -12,9 +12,11 @@ export function ejecutarDeterministaND(
   fin = 999999
 ): Promise<ResultadoDeterministaND> {
   return new Promise((resolve, reject) => {
-    const script = path.join(process.cwd(), 'src/extraction-neurons/nd-deterministic/deterministic_stream.py');
-    const proc = spawn('python3', [script, String(inicio), String(fin)], {
+    const script = path.join(__dirname, 'deterministic_stream.py');
+    const python = process.env.ND_PYTHON || 'python3';
+    const proc = spawn(python, [script, String(inicio), String(fin)], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: process.cwd(),
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
@@ -29,10 +31,6 @@ export function ejecutarDeterministaND(
     proc.stdout.on('data', d => out.push(Buffer.from(d)));
     proc.stderr.on('data', d => err.push(Buffer.from(d)));
     proc.on('error', fail);
-
-    // Si el extractor termina antes de consumir todo el PDF, Node puede emitir
-    // EPIPE al cerrar stdin. No dejamos que ese error mate el runner ND: el
-    // cierre del proceso es la fuente de verdad y se informa mediante stderr.
     proc.stdin.on('error', () => {});
 
     proc.on('close', code => {
@@ -46,7 +44,10 @@ export function ejecutarDeterministaND(
       try {
         const resultado = JSON.parse(stdout);
         settled = true;
-        resolve({ pages: Array.isArray(resultado.pages) ? resultado.pages : [], findings: Array.isArray(resultado.findings) ? resultado.findings : [] });
+        resolve({
+          pages: Array.isArray(resultado.pages) ? resultado.pages : [],
+          findings: Array.isArray(resultado.findings) ? resultado.findings : [],
+        });
       } catch (e: any) {
         fail(new Error(`JSON inválido del extractor determinista: ${e?.message || e}\nSTDERR:\n${stderr}\nSTDOUT:\n${stdout.slice(0,1000)}`));
       }
