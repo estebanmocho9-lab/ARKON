@@ -2,8 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolverSubcarpetaPorNombre, listarPDFs, descargarArchivo, extraerIdCarpeta } from '../drive/driveReader';
 import { extraerPaginas, detectarCapitulo } from '../pdf/pdfParser';
-import { prepararSheetsND, paginaYaProcesadaNDSheets, registrarDocumentoNDSheets, guardarPaginaNDSheets, finalizarDocumentoNDSheets, resetSheetsNDContext } from '../sheets/ndSheetsPersistence';
-import { crearSpreadsheetND, resetNDSpreadsheet } from '../sheets/ndSheetsConnection';
+import { prepararEsquemaNDTurso, paginaYaProcesadaNDTurso, iniciarDocumentoNDTurso, guardarPaginaNDTurso, finalizarDocumentoNDTurso, fallarDocumentoNDTurso } from '../turso/ndTursoPersistence';
 import { ejecutarDeterministaND } from '../nd-deterministic/runDeterministicND';
 import { procesarDocumentoND, PaginaND } from './procesadorDocumentoND';
 
@@ -21,6 +20,7 @@ export abstract class NeuronNDBaseSheetsV2{
 
  async ejecutar(limiteDocumentos?:number,limitePaginas?:number,nombreObjetivo?:string):Promise<void>{
   console.log(`\n🧠 ${this.neuronId} — ND documental — carpeta ${this.numeroCarpeta}`);
+  await prepararEsquemaNDTurso();
   const cp=this.cargar();
   const carpeta=await resolverSubcarpetaPorNombre(this.obtenerCarpetaMadreId(),this.numeroCarpeta);
   let archivos=await listarPDFs(carpeta);
@@ -34,12 +34,8 @@ export abstract class NeuronNDBaseSheetsV2{
    let buffer:Buffer;
    try{buffer=await descargarArchivo(archivo.id)}catch(e:any){console.error(`      ❌ Drive: ${e?.message||e}`);continue}
    const inicio=FORZAR_REANALISIS||limitePaginas?1:(cp.documentoEnProgreso?.driveFileId===archivo.id?cp.documentoEnProgreso.ultimaPaginaCompletada+1:1);
+   let ejecucionId:number|undefined;
    try{
-    resetNDSpreadsheet();
-    resetSheetsNDContext();
-    const spreadsheetId=await crearSpreadsheetND(archivo.nombre);
-    await prepararSheetsND();
-    console.log(`      💾 Resultado ND de este PDF: ${spreadsheetId}`);
     const todas=await extraerPaginas(buffer);
     const seleccion=limitePaginas?todas.slice(0,limitePaginas):todas;
     const paginas:PaginaND[]=[];let off=0;
@@ -53,28 +49,29 @@ export abstract class NeuronNDBaseSheetsV2{
     }
     const resultado=procesarDocumentoND(paginas,archivo.nombre,archivo.id,this.neuronId,determinista.findings);
     console.log(`      🧠 ND fusionado: ${resultado.hallazgos.length} hallazgos`);
-    await registrarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length});
+    ejecucionId=await iniciarDocumentoNDTurso({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length});
+    console.log(`      💾 Turso: documento iniciado (ejecución ${ejecucionId})`);
     const porPagina=new Map<number,typeof resultado.hallazgos>();
     for(const h of resultado.hallazgos){const a=porPagina.get(h.evidencia.pagina)||[];a.push(h);porPagina.set(h.evidencia.pagina,a)}
     let guardados=0,procesadas=0,last=inicio-1;
     for(const pagina of seleccion){
      if(pagina.pagina<inicio)continue;
      if(limitePaginas&&pagina.pagina>limitePaginas)break;
-     if(!FORZAR_REANALISIS&&!limitePaginas&&await paginaYaProcesadaNDSheets(archivo.id,this.neuronId,pagina.pagina))continue;
+     if(!FORZAR_REANALISIS&&!limitePaginas&&await paginaYaProcesadaNDTurso(archivo.id,pagina.pagina))continue;
      const hs=porPagina.get(pagina.pagina)||[];
      const cap=detectarCapitulo(pagina.texto||'');
-     for(const h of hs){h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,motor:'ND-comprension-bloques-5extractores-determinista-16RAM'};if(cap)h.evidencia.seccion=cap}
+     for(const h of hs){h.metadatos={...(h.metadatos||{}),documentoDriveId:archivo.id,carpetaDrive:this.numeroCarpeta,motor:'ND-comprension-bloques-5extractores-determinista-16RAM',persistencia:'turso'};if(cap)h.evidencia.seccion=cap}
      const paginaDeterminista=determinista.pages.find((p:any)=>Number(p.page??p.pagina)===pagina.pagina);
-     const n=await guardarPaginaNDSheets(hs,archivo.id,archivo.nombre,this.neuronId,this.numeroCarpeta,pagina.pagina,paginaDeterminista);
+     const n=await guardarPaginaNDTurso(hs,archivo.id,archivo.nombre,this.neuronId,this.numeroCarpeta,pagina.pagina,paginaDeterminista);
      guardados+=n;procesadas++;last=pagina.pagina;
      cp.documentoEnProgreso={driveFileId:archivo.id,ultimaPaginaCompletada:last};this.guardar(cp);
-     console.log(`      📄 ${pagina.pagina}/${todas.length} → ${n} hallazgos`);
+     console.log(`      📄 ${pagina.pagina}/${todas.length} → ${n} hallazgos guardados en Turso`);
     }
     const completo=!limitePaginas&&last>=todas.length&&todas.length>0;
-    if(completo){await finalizarDocumentoNDSheets({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length,paginasProcesadas:procesadas,hallazgosTotal:guardados});cp.documentosCompletos=[...cp.documentosCompletos.filter(id=>id!==archivo.id),archivo.id];delete cp.documentoEnProgreso;this.guardar(cp);console.log(`      ✅ ${guardados} hallazgos`)}
-    else{this.guardar(cp);console.log(`      🧪 ${guardados} hallazgos, ${procesadas} páginas procesadas`)}
+    if(completo){await finalizarDocumentoNDTurso({documentoDriveId:archivo.id,nombre:archivo.nombre,neuronId:this.neuronId,carpetaDrive:this.numeroCarpeta,paginasTotal:todas.length,paginasProcesadas:procesadas,hallazgosTotal:guardados,ejecucionId});cp.documentosCompletos=[...cp.documentosCompletos.filter(id=>id!==archivo.id),archivo.id];delete cp.documentoEnProgreso;this.guardar(cp);console.log(`      ✅ ${guardados} hallazgos persistidos en Turso`)}
+    else{this.guardar(cp);console.log(`      🧪 ${guardados} hallazgos, ${procesadas} páginas persistidas en Turso`)}
     hechos++;
-   }catch(e:any){console.error(`      ❌ ND: ${e?.message||e}`);this.guardar(cp)}
+   }catch(e:any){console.error(`      ❌ ND: ${e?.message||e}`);if(ejecucionId)await fallarDocumentoNDTurso(archivo.id,ejecucionId,String(e?.message||e));this.guardar(cp)}
    finally{buffer=Buffer.alloc(0)}
   }
   console.log(`\n🏁 ${this.neuronId}: ${hechos} documentos procesados.`);
