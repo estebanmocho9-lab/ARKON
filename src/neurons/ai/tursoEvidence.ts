@@ -54,13 +54,18 @@ function likeGroup(columns: string[], terms: string[]): { sql: string; args: str
   return { sql: `(${clauses.join(' OR ')})`, args };
 }
 
-function materialTermsFor(family: AIProductFamily, productName: string, materialId?: string | null): string[] {
-  const common = family === 'mdf'
-    ? ['MDF', 'tablero MDF', 'mueble de MDF', 'tablero de fibras de densidad media', 'medium density fibreboard', 'medium density fiberboard']
+function materialTermsFor(family: AIProductFamily, materialName: string, materialId?: string | null): string[] {
+  // The resolved catalog material is the primary identity. Do not widen a
+  // component lookup (e.g. perlita) to every material in its host product
+  // family (e.g. yeso), which would mix evidence from different substances.
+  const exactName = String(materialName ?? '').trim();
+  if (exactName) return safeTerms([exactName]);
+  const aliases = family === 'mdf'
+    ? ['MDF', 'tablero MDF', 'medium density fibreboard', 'medium density fiberboard']
     : family === 'gypsum'
-      ? ['yeso', 'placa de yeso', 'placa antihumedad de yeso', 'gypsum board', 'moisture resistant gypsum board', 'plasterboard']
-      : family === 'concrete' ? ['hormigón', 'hormigon', 'bloque de hormigón', 'bloque de concreto', 'concrete block', 'concrete masonry unit'] : [];
-  return safeTerms([productName, ...common]);
+      ? ['yeso', 'placa de yeso', 'gypsum board', 'plasterboard']
+      : family === 'concrete' ? ['hormigón', 'bloque de hormigón', 'concrete block'] : [];
+  return safeTerms(aliases.length ? aliases : [String(materialId ?? '')]);
 }
 
 function mapNDRow(row: Record<string, any>): TursoEvidenceCandidate {
