@@ -17,6 +17,14 @@ export interface AINeuronSubCable {
   requiredProperties: string[];
 }
 
+export interface AINeuronSourceMetadata {
+  group: string;
+  definition: string;
+  referenceUnit: string;
+  physicalRange: { min: number | null; max: number | null };
+  relatedProperties: string[];
+}
+
 export interface AINeuronProfile {
   id: string;
   coreNeuronId: string;
@@ -29,6 +37,7 @@ export interface AINeuronProfile {
   cables: AINeuronCable[];
   subCables: AINeuronSubCable[];
   evidenceTerms: string[];
+  sourceNeuron?: AINeuronSourceMetadata;
 }
 
 export interface TursoEvidenceCandidate {

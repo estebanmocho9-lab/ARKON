@@ -7,7 +7,7 @@ import { activarNeuronas } from './core/activationEngine';
 import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncData';
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
-import { runAINeuronAgents } from './neurons/ai/agentEngine';
+import { analyzeWithLlamaMotherBrain } from './neurons/ai/motherBrain';
 
 dotenv.config();
 
@@ -244,7 +244,7 @@ app.post('/api/analizar', async (req, res) => {
         for (const n of activacion.neuronasActivadas) {
           currentProperties[n.propertyName] = { value: n.valorCompuesto, confidence: n.confianza, neuronId: n.neuronId };
         }
-        aiNeurons = await runAINeuronAgents({
+        aiNeurons = await analyzeWithLlamaMotherBrain({
           productName: product.nombre,
           productId: product.id,
           materialId,
