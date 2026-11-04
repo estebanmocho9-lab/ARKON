@@ -123,15 +123,25 @@ export async function searchTursoEvidence(
   const warnings: string[] = [];
 
   try {
-    const result = await turso.execute({
-      sql: `SELECT id, tipo, campo, texto_original, texto_normalizado, entidad_candidata, entidad_principal,
+    const rawSql = (stateFilter: string) => `SELECT id, tipo, campo, texto_original, texto_normalizado, entidad_candidata, entidad_principal,
                    aspecto, dato_documental, valor, valor_texto, unidad, contexto, confianza,
                    evidencia_json, metadatos_json, documento_drive_id, pagina, seccion
             FROM nd_hallazgos_raw
-            WHERE ${materialGroup.sql} AND ${propertyGroup.sql} AND ${stateGroup.sql}
-            ORDER BY confianza DESC, pagina ASC LIMIT ?`,
+            WHERE ${materialGroup.sql} AND ${propertyGroup.sql} AND ${stateFilter}
+            ORDER BY confianza DESC, pagina ASC LIMIT ?`;
+    let result = await turso.execute({
+      sql: rawSql(stateGroup.sql),
       args: [...materialGroup.args, ...propertyGroup.args, ...stateGroup.args, MAX_EVIDENCE],
     });
+    // A state label is a hint, not a reason to discard otherwise relevant
+    // source evidence. If no exact label match exists, retrieve candidates
+    // without the state filter and let the agent report unknown/mismatch.
+    if (!result.rows.length && stateTerms.length) {
+      result = await turso.execute({
+        sql: rawSql('1 = 1'),
+        args: [...materialGroup.args, ...propertyGroup.args, MAX_EVIDENCE],
+      });
+    }
     tablesRead.push('nd_hallazgos_raw');
     evidence.push(...result.rows.map((r: any) => mapNDRow(r as Record<string, any>)));
   } catch {
@@ -143,15 +153,22 @@ export async function searchTursoEvidence(
     const materialMatch = likeGroup(['e.entidad', 'd.dato_documental'], materialTerms);
     const propertyMatch = likeGroup(['d.aspecto', 'd.dato_documental'], propertyTerms);
     const dataStateMatch = stateTerms.length ? likeGroup(['d.dato_documental', 'd.evidencia_json'], stateTerms) : { sql: '1 = 1', args: [] };
-    const result = await turso.execute({
-      sql: `SELECT d.id, d.documento_drive_id, d.pagina, d.aspecto, d.dato_documental,
+    const dataSql = (stateFilter: string) => `SELECT d.id, d.documento_drive_id, d.pagina, d.aspecto, d.dato_documental,
                    d.evidencia_json, e.entidad AS material
             FROM nd_datos_entidad d
             LEFT JOIN nd_entidades_documentales e ON e.clave_entidad = d.clave_entidad
-            WHERE ${materialMatch.sql} AND ${propertyMatch.sql} AND ${dataStateMatch.sql}
-            ORDER BY d.pagina ASC LIMIT ?`,
+            WHERE ${materialMatch.sql} AND ${propertyMatch.sql} AND ${stateFilter}
+            ORDER BY d.pagina ASC LIMIT ?`;
+    let result = await turso.execute({
+      sql: dataSql(dataStateMatch.sql),
       args: [...materialMatch.args, ...propertyMatch.args, ...dataStateMatch.args, MAX_EVIDENCE],
     });
+    if (!result.rows.length && stateTerms.length) {
+      result = await turso.execute({
+        sql: dataSql('1 = 1'),
+        args: [...materialMatch.args, ...propertyMatch.args, MAX_EVIDENCE],
+      });
+    }
     tablesRead.push('nd_datos_entidad');
     for (const row of result.rows as any[]) {
       const ev = parseObject(row.evidencia_json);
