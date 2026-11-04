@@ -8,6 +8,7 @@ import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncDat
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
 import { analyzeWithLlamaMotherBrain, runAINeuronCalculations } from './neurons/ai/motherBrain';
+import { getAINeuronTursoClient } from './neurons/ai/aiTursoClient';
 
 dotenv.config();
 
@@ -144,6 +145,41 @@ app.post('/api/analizar-llama-turso', async (req, res) => {
   } catch (error) {
     console.error('POST /api/analizar-llama-turso:', error);
     return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.get('/api/ai-neurons/health', async (req, res) => {
+  try {
+    const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+    const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+    const expectedBytes = Buffer.from(expectedToken ?? '');
+    const providedBytes = Buffer.from(providedToken);
+    const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+    if (!tokenMatches) return res.status(401).json({ ok: false, error: 'Diagnóstico IA no autorizado.' });
+
+    const turso = getAINeuronTursoClient();
+    let tursoStatus: 'not_configured' | 'unreachable' | 'schema_missing' | 'connected' = turso ? 'unreachable' : 'not_configured';
+    let evidenceRows: number | null = null;
+    if (turso) {
+      try {
+        const result = await turso.execute('SELECT COUNT(*) AS total FROM nd_hallazgos_raw');
+        evidenceRows = Number(result.rows[0]?.total ?? 0);
+        tursoStatus = 'connected';
+      } catch {
+        tursoStatus = 'schema_missing';
+      }
+    }
+
+    const llamaConfigured = Boolean(process.env.CLOUDFLARE_ACCOUNT_ID?.trim() && process.env.CLOUDFLARE_API_TOKEN?.trim());
+    return res.json({
+      ok: true,
+      turso: { status: tursoStatus, evidenceRows },
+      llama: { configured: llamaConfigured, model: process.env.CLOUDFLARE_MODEL?.trim() || '@cf/meta/llama-3.2-3b-instruct' },
+      requiredSyncCommand: 'npm run sync:ai-turso',
+    });
+  } catch (error) {
+    console.error('GET /api/ai-neurons/health:', error);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el estado de la capa IA.' });
   }
 });
 
