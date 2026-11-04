@@ -10,12 +10,25 @@ export interface ComponenteBase {
   fraccion: number;     // 0..1, suma total de componentes debe ser 1
 }
 
+export interface NeuronDataVector {
+  materialId: string;
+  estado: EstadoMaterial;
+  propiedades: Record<string, number | null>;
+}
+
+/** Optional per-run data source. When present, the neuron must not fall back to Sheets. */
+export interface NeuronDataProvider {
+  getNormalizedValue(materialId: string, propertyName: string, estado: EstadoMaterial): Promise<number | null>;
+  getMaterialVector(materialId: string, estado: EstadoMaterial): Promise<NeuronDataVector | null>;
+}
+
 export interface NeuronInput {
   materialId: string;               // ID del material principal o de la mezcla
   estado: EstadoMaterial;           // estado físico a analizar
   valorDirecto?: number | null;     // si es material puro y ya se conoce el índice normalizado 0-100
   componentes?: ComponenteBase[];   // si es una mezcla
   contexto?: Record<string, any>;   // temperatura, humedad, etc.
+  dataProvider?: NeuronDataProvider; // optional isolated provider for the AI clone; original calls omit it
 }
 
 export interface NeuronOutput {
