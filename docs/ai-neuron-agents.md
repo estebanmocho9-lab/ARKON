@@ -14,6 +14,18 @@ La ruta de Vercel `/api/analizar` solicita la rama `includeAiNeurons` y reenvía
 
 La salida conserva documento, página cuando existe, fragmento, valor, unidad, método y condición de ensayo. El servidor descarta citas que no correspondan a IDs recuperados y descarta un valor numérico de Llama si no coincide exactamente con una fuente citada. La capa no escribe en Supabase ni modifica Google Sheets. Una evaluación documental no certifica un producto ni reemplaza ensayos físicos.
 
+### Sincronización de la extracción ND hacia Turso IA
+
+La extracción ND vigente persiste sus hallazgos en la hoja `ND_HALLAZGOS` de Google Sheets; no escribe directamente en Turso. Por eso, crear una cuenta Turso IA vacía no basta para que las neuronas encuentren evidencia.
+
+Después de ejecutar la extracción ND, sincronizar la hoja hacia la cuenta dedicada desde el entorno local que tenga acceso a Google Sheets mediante gcloud y las dos variables `ARKON_AI_TURSO_DATABASE_URL` / `ARKON_AI_TURSO_AUTH_TOKEN`:
+
+```bash
+npm run sync:ai-turso
+```
+
+El proceso copia/upserta los hallazgos en `nd_hallazgos_raw` de Turso IA y prepara las tablas de consulta relacionadas. No modifica la hoja, el Turso original del extractor ni las filas fuente. Repetirlo después de nuevas extracciones para actualizar la copia. La cuenta IA sigue siendo consultada en modo solo lectura por las neuronas.
+
 ### Variables de entorno
 
 Configurar solamente en los servicios servidor, nunca en el repositorio:
