@@ -4,6 +4,8 @@
  */
 import * as dotenv from 'dotenv';
 dotenv.config();
+import * as fs from 'fs';
+import * as path from 'path';
 import { getAINeuronTursoClient } from '../../neurons/ai/aiTursoClient';
 import { prepararSheetsND, sheets } from './ndSheetsPersistence';
 import { getNDSpreadsheetId } from './ndSheetsConnection';
@@ -95,6 +97,10 @@ function parseJson(value: unknown): Record<string, any> {
 async function main() {
   const target = getAINeuronTursoClient();
   if (!target) throw new Error('Faltan ARKON_AI_TURSO_DATABASE_URL y ARKON_AI_TURSO_AUTH_TOKEN.');
+  const checkpoint = path.join(process.cwd(), 'checkpoints', 'ND_GOOGLE_SHEETS_ID');
+  const knownSheetId = process.env.ND_GOOGLE_SHEETS_ID?.trim() ||
+    (fs.existsSync(checkpoint) ? fs.readFileSync(checkpoint, 'utf8').trim() : '');
+  if (!knownSheetId) throw new Error('No se encontró ND_GOOGLE_SHEETS_ID ni checkpoints/ND_GOOGLE_SHEETS_ID. Se cancela para no crear una hoja ND vacía.');
   await prepararSheetsND();
   const spreadsheetId = getNDSpreadsheetId();
   const response = await sheets.spreadsheets.values.get({
