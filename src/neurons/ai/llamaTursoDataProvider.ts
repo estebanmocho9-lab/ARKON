@@ -47,8 +47,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     private readonly state: EstadoMaterial,
     private readonly stateName?: string | null,
   ) {
-    const normalized = materialName.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
-    this.family = /\\bmdf\\b|medium density (fibre|fiber)board/.test(normalized)
+    const normalized = materialName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    this.family = /\bmdf\b|medium density (fibre|fiber)board/.test(normalized)
       ? 'mdf'
       : /yeso|gypsum|plasterboard|drywall/.test(normalized)
         ? 'gypsum'
