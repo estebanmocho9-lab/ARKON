@@ -2,6 +2,7 @@ import { runAINeuronAgents, AINeuronAnalysisInput, AINeuronAnalysisResponse } fr
 import { DIRECT_AI_NEURONS } from './neurons';
 import { LlamaTursoDataProvider } from './llamaTursoDataProvider';
 import type { NeuronOutput, EstadoMaterial } from '../base/tipos';
+import { supabase } from '../../supabase/client';
 
 /**
  * Shared Llama mother brain. It is invoked on each authorized ARKON analysis,
@@ -59,7 +60,10 @@ export async function runAINeuronCalculations(input: AINeuronCalculationInput): 
   }).filter((neuron): neuron is typeof DIRECT_AI_NEURONS[number] => Boolean(neuron));
   const unique = [...new Map(selected.map(neuron => [neuron.id, neuron])).values()];
   if (!unique.length) throw new Error('No se reconocieron neuronas directas solicitadas.');
-  const provider = new LlamaTursoDataProvider(input.materialId, input.productName, state, input.stateName);
+  const { data: material } = await supabase.from('catalogo_materiales')
+    .select('nombre, nombre_en, sinonimos').eq('id_material', input.materialId).maybeSingle();
+  const materialName = String(material?.nombre ?? input.productName).trim();
+  const provider = new LlamaTursoDataProvider(input.materialId, materialName, state, input.stateName);
   const results: NeuronOutput[] = [];
   for (const neuron of unique) {
     const result = await neuron.process({
