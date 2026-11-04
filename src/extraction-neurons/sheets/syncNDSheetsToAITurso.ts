@@ -114,6 +114,16 @@ async function main() {
   }
 
   await target.executeMultiple(TABLES_SQL);
+  const ensureColumn = async (name: string, type: string) => {
+    const info = await target.execute('PRAGMA table_info(nd_hallazgos_raw)');
+    if (!info.rows.some(row => String(row.name) === name)) {
+      await target.execute(`ALTER TABLE nd_hallazgos_raw ADD COLUMN ${name} ${type}`);
+    }
+  };
+  await ensureColumn('entidad_principal', 'TEXT');
+  await ensureColumn('aspecto', 'TEXT');
+  await ensureColumn('dato_documental', 'TEXT');
+  await ensureColumn('relacion_entidad', 'TEXT');
   let synced = 0;
   const batchSize = 50;
   const dataRows = rows.slice(1).filter(row => row.some(value => String(value ?? '').trim() !== ''));
