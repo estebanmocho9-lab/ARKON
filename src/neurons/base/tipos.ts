@@ -29,6 +29,7 @@ export interface NeuronInput {
   componentes?: ComponenteBase[];   // si es una mezcla
   contexto?: Record<string, any>;   // temperatura, humedad, etc.
   dataProvider?: NeuronDataProvider; // optional isolated provider for the AI clone; original calls omit it
+  persistMemory?: boolean; // false for read-only AI evaluations; default preserves original behavior
 }
 
 export interface NeuronOutput {
