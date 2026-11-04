@@ -70,6 +70,7 @@ export async function runAINeuronCalculations(input: AINeuronCalculationInput): 
       materialId: input.materialId,
       estado: state,
       dataProvider: provider,
+      persistMemory: false,
     });
     results.push(result);
   }
