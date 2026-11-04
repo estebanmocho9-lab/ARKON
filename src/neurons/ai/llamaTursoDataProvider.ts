@@ -115,7 +115,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     this.cache.set(key, normalized);
     if (normalized !== null) {
       const vectorKey = `${materialId.toUpperCase()}|${estado}`;
-      const current = this.vectorCache.get(vectorKey) ?? { materialId, estado, propiedades: {} };
+      const current: NeuronDataVector = this.vectorCache.get(vectorKey) ?? { materialId, estado, propiedades: {} };
       current.propiedades[propertyName] = normalized;
       this.vectorCache.set(vectorKey, current);
     }
