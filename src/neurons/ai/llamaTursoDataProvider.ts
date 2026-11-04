@@ -47,7 +47,14 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     private readonly state: EstadoMaterial,
     private readonly stateName?: string | null,
   ) {
-    this.family = 'general';
+    const normalized = materialName.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+    this.family = /\\bmdf\\b|medium density (fibre|fiber)board/.test(normalized)
+      ? 'mdf'
+      : /yeso|gypsum|plasterboard|drywall/.test(normalized)
+        ? 'gypsum'
+        : /hormigon|concrete/.test(normalized)
+          ? 'concrete'
+          : 'general';
   }
 
   private key(materialId: string, propertyName: string, state: EstadoMaterial): string {
@@ -75,7 +82,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
 
     const profile = profileFor(propertyName);
     const search = await searchTursoEvidence(
-      this.family, materialName, profile, materialId, (materialId.toUpperCase() === this.materialId.toUpperCase() && estado === this.state ? this.stateName : null) || (estado === 'E01' ? 'polvo' : estado === 'E02' ? 'fraguado' : 'degradado'),
+      this.family, materialName, profile, materialId, (materialId.toUpperCase() === this.materialId.toUpperCase() && estado === this.state ? this.stateName : null) || (estado === 'E01' ? 'comercial inicial' : estado === 'E02' ? 'fraguado seco' : 'degradado'),
     );
     if (!search.configured || search.evidence.length === 0) {
       this.cache.set(key, null);
