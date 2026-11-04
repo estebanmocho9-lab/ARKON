@@ -26,6 +26,10 @@ npm run sync:ai-turso
 
 El proceso copia/upserta los hallazgos en `nd_hallazgos_raw` de Turso IA y prepara las tablas de consulta relacionadas. No modifica la hoja, el Turso original del extractor ni las filas fuente. Repetirlo después de nuevas extracciones para actualizar la copia. La cuenta IA sigue siendo consultada en modo solo lectura por las neuronas.
 
+### Diagnóstico de conexión
+
+Con el token puente configurado, el servidor expone `GET /api/ai-neurons/health`. Devuelve únicamente presencia de configuración, estado de conexión/esquema y cantidad de hallazgos; nunca devuelve URLs, tokens ni credenciales. Debe consultarse con el encabezado `X-ARKON-TOKEN`. Un estado `schema_missing` o cero hallazgos indica que hay que preparar/sincronizar la cuenta Turso IA antes de probar neuronas.
+
 ### Variables de entorno
 
 Configurar solamente en los servicios servidor, nunca en el repositorio:
