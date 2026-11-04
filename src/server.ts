@@ -7,7 +7,7 @@ import { activarNeuronas } from './core/activationEngine';
 import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncData';
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
-import { analyzeWithLlamaMotherBrain } from './neurons/ai/motherBrain';
+import { analyzeWithLlamaMotherBrain, runAINeuronCalculations } from './neurons/ai/motherBrain';
 
 dotenv.config();
 
@@ -109,6 +109,40 @@ app.get('/api/products/:id', async (req, res) => {
  * ejecuta todos los problemas científicos configurados, y devuelve las
  * fuentes registradas de mejoras, fórmulas, cruces y TRIZ.
  */
+app.post('/api/analizar-llama-turso', async (req, res) => {
+  try {
+    const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+    const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+    const expectedBytes = Buffer.from(expectedToken ?? '');
+    const providedBytes = Buffer.from(providedToken);
+    const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+    if (!tokenMatches) return res.status(401).json({ ok: false, error: 'Modalidad IA no autorizada: configura ARKON_BRIDGE_TOKEN.' });
+
+    const rawId = req.body?.productId ?? req.body?.material_id ?? req.body?.materialId;
+    const requestedId = rawId === undefined || rawId === null ? '' : String(rawId).trim();
+    if (!requestedId) return res.status(400).json({ ok: false, error: 'productId, material_id o materialId es obligatorio.' });
+    const product = await resolverProducto(requestedId);
+    if (!product) return res.status(404).json({ ok: false, error: 'Producto/material no encontrado en Supabase.' });
+
+    const materialId = String(product.material_id ?? '').trim();
+    if (!/^M\.\d+$/i.test(materialId)) return res.status(422).json({ ok: false, error: 'material_id inválido.' });
+    const neuronIds = Array.isArray(req.body?.neuronIds)
+      ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string')
+      : (typeof req.body?.propertyName === 'string' ? [req.body.propertyName] : undefined);
+    const result = await runAINeuronCalculations({
+      productName: product.nombre,
+      materialId,
+      stateCode: typeof req.body?.estado === 'string' ? req.body.estado : null,
+      stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null,
+      neuronIds,
+    });
+    return res.json({ ok: true, modalidad: 'llama-turso-neuronas', producto: { id: product.id, nombre: product.nombre, materialId }, resultado: result });
+  } catch (error) {
+    console.error('POST /api/analizar-llama-turso:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 app.post('/api/analizar', async (req, res) => {
   try {
     // Aceptar tanto IDs JSON numéricos como strings y también material_id/materialId.
