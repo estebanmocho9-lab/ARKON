@@ -13,6 +13,7 @@ export interface AINeuronAnalysisInput {
   productId?: string | number | null;
   materialId?: string | null;
   materialName?: string | null;
+  composition?: unknown;
   family?: AIProductFamily | null;
   neuronIds?: string[];
   stateCode?: string | null;
@@ -195,7 +196,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   const usableCrosses = relevantContextRows(input.scientificContext?.scientificCrosses, profile);
   const usableTriz = relevantContextRows(input.scientificContext?.triz, profile);
   const payload = {
-    product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, family, knownAliases: candidateFamilies()[family] },
+    product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, composition: input.composition ?? null, family, knownAliases: candidateFamilies()[family] },
     requestedState: { code: stateCode, name: boundedText(stateName, 100) || null, explicitlyProvided: Boolean(stateCode || stateName) },
     neuron: {
       id: profile.id, attribute: profile.attribute, nucleus: profile.nucleus,
