@@ -126,6 +126,10 @@ app.post('/api/analizar-llama-turso', async (req, res) => {
 
     const materialId = String(product.material_id ?? '').trim();
     if (!/^M\.\d+$/i.test(materialId)) return res.status(422).json({ ok: false, error: 'material_id inválido.' });
+    const requestedState = typeof req.body?.estado === 'string' ? req.body.estado.trim().toUpperCase() : '';
+    if (!['E01', 'E02', 'E03'].includes(requestedState)) {
+      return res.status(422).json({ ok: false, error: 'Debe indicar un estado material válido: E01, E02 o E03. ARKON no asigna un estado por defecto.' });
+    }
     const neuronIds = Array.isArray(req.body?.neuronIds)
       ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string')
       : (typeof req.body?.propertyName === 'string' ? [req.body.propertyName] : undefined);
