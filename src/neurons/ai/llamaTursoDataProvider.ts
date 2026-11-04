@@ -3,6 +3,7 @@ import { DIRECT_AI_NEURONS } from './neurons';
 import { searchTursoEvidence } from './tursoEvidence';
 import { requestLlamaAssessment } from './llamaClient';
 import type { AINeuronProfile, AIProductFamily } from './types';
+import { supabase } from '../../supabase/client';
 
 function parseJson(raw: string): Record<string, unknown> | null {
   const cleaned = raw.trim().replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\s*\x60\x60\x60$/, '');
@@ -37,6 +38,7 @@ function profileFor(propertyName: string): AINeuronProfile {
 export class LlamaTursoDataProvider implements NeuronDataProvider {
   private readonly cache = new Map<string, number | null>();
   private readonly vectorCache = new Map<string, NeuronDataVector>();
+  private readonly materialNames = new Map<string, string>();
   private readonly family: AIProductFamily;
 
   constructor(
@@ -55,11 +57,25 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
   async getNormalizedValue(materialId: string, propertyName: string, estado: EstadoMaterial): Promise<number | null> {
     const key = this.key(materialId, propertyName, estado);
     if (this.cache.has(key)) return this.cache.get(key) ?? null;
-    if (materialId.toUpperCase() !== this.materialId.toUpperCase() || estado !== this.state) return null;
+    let materialName = this.materialNames.get(materialId.toUpperCase());
+    if (!materialName) {
+      if (materialId.toUpperCase() === this.materialId.toUpperCase()) {
+        materialName = this.materialName;
+      } else {
+        const { data } = await supabase.from('catalogo_materiales')
+          .select('nombre').eq('id_material', materialId).maybeSingle();
+        materialName = String(data?.nombre ?? '').trim();
+      }
+      if (!materialName) {
+        this.cache.set(key, null);
+        return null;
+      }
+      this.materialNames.set(materialId.toUpperCase(), materialName);
+    }
 
     const profile = profileFor(propertyName);
     const search = await searchTursoEvidence(
-      this.family, this.materialName, profile, materialId, this.stateName || (estado === 'E01' ? 'polvo' : estado === 'E02' ? 'fraguado' : 'degradado'),
+      this.family, materialName, profile, materialId, (materialId.toUpperCase() === this.materialId.toUpperCase() && estado === this.state ? this.stateName : null) || (estado === 'E01' ? 'polvo' : estado === 'E02' ? 'fraguado' : 'degradado'),
     );
     if (!search.configured || search.evidence.length === 0) {
       this.cache.set(key, null);
@@ -92,6 +108,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
       value >= 0 && value <= 100 &&
       typeof parsed?.unit === 'string' &&
       parsed.unit.trim().toLowerCase() === String(candidate.unit ?? '').trim().toLowerCase() &&
+      parsed?.normalizedScale === '0-100' &&
       isExplicitArkonNormalizedUnit(candidate.unit),
     );
     const normalized = valid ? value : null;
