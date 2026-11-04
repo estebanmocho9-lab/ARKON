@@ -46,8 +46,10 @@ export interface AINeuronCalculationResponse {
  * same provider through NeuronInput.
  */
 export async function runAINeuronCalculations(input: AINeuronCalculationInput): Promise<AINeuronCalculationResponse> {
-  const state: EstadoMaterial =
-    input.stateCode === 'E02' || input.stateCode === 'E03' ? input.stateCode : 'E01';
+  if (input.stateCode !== 'E01' && input.stateCode !== 'E02' && input.stateCode !== 'E03') {
+    throw new Error('Debe indicarse explícitamente E01, E02 o E03; no se asigna un estado material por defecto.');
+  }
+  const state: EstadoMaterial = input.stateCode;
   const normalize = (value: string) => value.trim().toLowerCase().replace(/^ai-/, '').replace(/_/g, '-');
   const requested = input.neuronIds?.length ? input.neuronIds.slice(0, 12) : DEFAULT_DEMO_AI_NEURON_IDS;
   const selected = requested.map(raw => {
