@@ -10,7 +10,7 @@ La capa es aditiva: conserva `ALL_NEURONS` y el motor numérico actual sin reemp
 
 ### Flujo y privacidad
 
-La ruta de Vercel `/api/analizar` solicita la rama `includeAiNeurons` y reenvía el código de estado. ARKON comprueba `X-ARKON-TOKEN` antes de ejecutar la rama IA en producción. El proceso de ARKON consulta Turso en modo lectura, con SQL estático y parámetros enlazados, sobre `nd_hallazgos_raw` y, si existe, `propiedades_extraidas`. Llama recibe los fragmentos seleccionados y un subconjunto relacionado de fórmulas/reglas; nunca recibe credenciales ni acceso directo a cuentas o bases de datos.
+La ruta de Vercel `/api/analizar` solicita la rama `includeAiNeurons` y reenvía el código de estado. ARKON comprueba `X-ARKON-TOKEN` antes de ejecutar la rama IA en producción. Esta capa usa un cliente Turso independiente con `ARKON_AI_TURSO_DATABASE_URL` y `ARKON_AI_TURSO_AUTH_TOKEN`; no reutiliza ni cae como respaldo a la cuenta Turso del extractor. En modo solo lectura consulta tablas declaradas por el esquema ND, como `nd_hallazgos_raw` y `nd_datos_entidad`, mediante SQL fijo y parámetros enlazados. El servidor usa el cliente Supabase que ya tiene ARKON y entrega a Llama los fragmentos seleccionados y reglas/fórmulas/cruces/TRIZ pertinentes; nunca entrega credenciales ni acceso directo a cuentas o bases de datos.
 
 La salida conserva documento, página cuando existe, fragmento, valor, unidad, método y condición de ensayo. El servidor descarta citas que no correspondan a IDs recuperados y descarta un valor numérico de Llama si no coincide exactamente con una fuente citada. La capa no escribe en Supabase ni modifica Google Sheets. Una evaluación documental no certifica un producto ni reemplaza ensayos físicos.
 
@@ -18,7 +18,7 @@ La salida conserva documento, página cuando existe, fragmento, valor, unidad, m
 
 Configurar solamente en los servicios servidor, nunca en el repositorio:
 
-- En Render/ARKON: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` y `ARKON_BRIDGE_TOKEN`.
+- En Render/ARKON para la cuenta Turso exclusiva de esta capa: `ARKON_AI_TURSO_DATABASE_URL` y `ARKON_AI_TURSO_AUTH_TOKEN`. Además: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` y `ARKON_BRIDGE_TOKEN`. `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` siguen reservadas al Turso existente del extractor.
 - En Vercel/Impulso Vector: `ARKON_BRIDGE_URL` y el mismo valor secreto de `ARKON_BRIDGE_TOKEN`. Las variables `CLOUDFLARE_ACCOUNT_ID` y `CLOUDFLARE_API_TOKEN` en Vercel se conservan para la síntesis de respaldo ya existente.
 - `CLOUDFLARE_MODEL` es opcional; por defecto se usa `@cf/meta/llama-3.2-3b-instruct`.
 
@@ -44,7 +44,7 @@ This is an additive layer: `ALL_NEURONS` and the existing numerical engine remai
 
 ### Flow and privacy
 
-Vercel's `/api/analizar` route requests `includeAiNeurons` and forwards the selected state code. In production, ARKON checks `X-ARKON-TOKEN` before running the AI branch. ARKON reads Turso using fixed, parameterized SQL against `nd_hallazgos_raw` and, when present, `propiedades_extraidas`. Llama receives selected evidence fragments and a relevant subset of formulas/rules; it never receives credentials or direct database/account access.
+Vercel's `/api/analizar` route requests `includeAiNeurons` and forwards the selected state code. In production, ARKON checks `X-ARKON-TOKEN` before running the AI branch. This layer uses a separate Turso client with `ARKON_AI_TURSO_DATABASE_URL` and `ARKON_AI_TURSO_AUTH_TOKEN`; it neither reuses nor falls back to the extractor's Turso account. It performs read-only, parameterized queries against ND-schema tables such as `nd_hallazgos_raw` and `nd_datos_entidad`. The server reuses ARKON's existing Supabase client and sends Llama selected evidence and relevant rules/formulas/crosses/TRIZ; Llama never receives credentials or direct database/account access.
 
 The response preserves document, page when available, excerpt, value, unit, method, and test condition. The server rejects citations not matching retrieved evidence IDs and rejects a numeric value returned by Llama if it does not exactly match a cited source. This layer does not write to Supabase or change Google Sheets. Documentary analysis does not certify a product or replace physical testing.
 
@@ -52,7 +52,7 @@ The response preserves document, page when available, excerpt, value, unit, meth
 
 Set these only in server-side services, never in the repository:
 
-- Render/ARKON: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `ARKON_BRIDGE_TOKEN`.
+- Render/ARKON for this layer's dedicated Turso account: `ARKON_AI_TURSO_DATABASE_URL` and `ARKON_AI_TURSO_AUTH_TOKEN`. Also set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `ARKON_BRIDGE_TOKEN`. `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` remain reserved for the extractor's existing Turso account.
 - Vercel/Impulso Vector: `ARKON_BRIDGE_URL` and the same secret value for `ARKON_BRIDGE_TOKEN`. Existing `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Vercel remain in place for the existing fallback synthesis.
 - `CLOUDFLARE_MODEL` is optional; the default is `@cf/meta/llama-3.2-3b-instruct`.
 

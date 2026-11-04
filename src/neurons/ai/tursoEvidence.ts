@@ -1,4 +1,5 @@
 import { AIProductFamily, AINeuronProfile, TursoEvidenceCandidate } from './types';
+import { getAINeuronTursoClient } from './aiTursoClient';
 
 export interface TursoSearchResult {
   configured: boolean;
@@ -83,42 +84,21 @@ function mapNDRow(row: Record<string, any>): TursoEvidenceCandidate {
   };
 }
 
-function mapLegacyRow(row: Record<string, any>): TursoEvidenceCandidate {
-  const doc = text(row.documento) ?? text(row.drive_file_id) ?? 'documento-sin-nombre';
-  const page = numberOrNull(row.pagina);
-  return {
-    id: `prop:${text(row.drive_file_id) ?? doc}:${page ?? 's/p'}:${text(row.nombre_propiedad) ?? 'propiedad'}:${text(row.valor_encontrado) ?? 's/v'}`,
-    table: 'propiedades_extraidas',
-    material: text(row.material ?? row.familia_material ?? row.subfamilia_material),
-    property: text(row.nombre_propiedad ?? row.nombre_ingles),
-    document: doc,
-    page,
-    excerpt: (text(row.fragmento_texto ?? row.observaciones ?? row.valor_encontrado) ?? '').slice(0, MAX_EXCERPT_CHARS),
-    rawValue: text(row.valor_encontrado),
-    unit: text(row.unidad),
-    condition: text(row.condicion_ensayo),
-    method: text(row.metodo_ensayo ?? row.norma),
-    sourceType: text(row.origen_dato),
-    confidence: numberOrNull(row.nivel_confianza),
-  };
-}
-
 /**
  * Recupera candidatos solamente de tablas de extracción conocidas. No escribe,
  * no ejecuta SQL generado por el modelo y nunca devuelve filas sin procedencia.
- * La consulta ND usa el esquema definido en src/turso/esquemaND.ts; también
- * intenta la tabla legada de propiedades extraídas si existe en la DB real.
+ * La consulta usa exclusivamente la cuenta ARKON_AI_TURSO_* y tablas ND
+ * definidas en src/turso/esquemaND.ts; no adivina el esquema legado.
  */
 export async function searchTursoEvidence(
   family: AIProductFamily,
   productName: string,
   profile: AINeuronProfile,
 ): Promise<TursoSearchResult> {
-  if (!process.env.TURSO_DATABASE_URL?.trim() || !process.env.TURSO_AUTH_TOKEN?.trim()) {
-    return { configured: false, evidence: [], tablesRead: [], warnings: ['Turso no está configurado en el servidor ARKON.'] };
+  const turso = getAINeuronTursoClient();
+  if (!turso) {
+    return { configured: false, evidence: [], tablesRead: [], warnings: ['La cuenta Turso dedicada a las neuronas IA no está configurada en el servidor ARKON.'] };
   }
-
-  const { turso } = await import('../../turso/tursoClient');
   const materialGroup = likeGroup(
     ['entidad_principal', 'entidad_candidata', 'dato_documental', 'texto_original', 'texto_normalizado', 'contexto'],
     materialTermsFor(family, productName),
@@ -150,28 +130,39 @@ export async function searchTursoEvidence(
   }
 
   try {
-    const legacyMaterial = likeGroup(
-      ['material', 'familia_material', 'subfamilia_material', 'componente', 'fragmento_texto'],
-      materialTermsFor(family, productName),
-    );
-    const legacyProperty = likeGroup(
-      ['nombre_propiedad', 'nombre_ingles', 'sinonimos', 'fragmento_texto', 'observaciones'],
-      propertyTerms,
-    );
+    const materialTerms = materialTermsFor(family, productName);
+    const materialMatch = likeGroup(['e.entidad', 'd.dato_documental'], materialTerms);
+    const propertyMatch = likeGroup(['d.aspecto', 'd.dato_documental'], propertyTerms);
     const result = await turso.execute({
-      sql: `SELECT documento, drive_file_id, pagina, capitulo, nombre_propiedad, nombre_ingles,
-                   familia_material, subfamilia_material, material, componente, unidad,
-                   valor_encontrado, condicion_ensayo, metodo_ensayo, norma, nivel_confianza,
-                   origen_dato, observaciones, fragmento_texto
-            FROM propiedades_extraidas
-            WHERE ${legacyMaterial.sql} AND ${legacyProperty.sql}
-            LIMIT ?`,
-      args: [...legacyMaterial.args, ...legacyProperty.args, MAX_EVIDENCE],
+      sql: `SELECT d.id, d.documento_drive_id, d.pagina, d.aspecto, d.dato_documental,
+                   d.evidencia_json, e.entidad AS material
+            FROM nd_datos_entidad d
+            LEFT JOIN nd_entidades_documentales e ON e.clave_entidad = d.clave_entidad
+            WHERE ${materialMatch.sql} AND ${propertyMatch.sql}
+            ORDER BY d.pagina ASC LIMIT ?`,
+      args: [...materialMatch.args, ...propertyMatch.args, MAX_EVIDENCE],
     });
-    tablesRead.push('propiedades_extraidas');
-    evidence.push(...result.rows.map((r: any) => mapLegacyRow(r as Record<string, any>)));
+    tablesRead.push('nd_datos_entidad');
+    for (const row of result.rows as any[]) {
+      const ev = parseObject(row.evidencia_json);
+      evidence.push({
+        id: `nd-data:${text(row.id) ?? 'unknown'}`,
+        table: 'nd_datos_entidad',
+        material: text(row.material),
+        property: text(row.aspecto),
+        document: text(row.documento_drive_id) ?? text(ev?.documento),
+        page: numberOrNull(row.pagina ?? ev?.pagina),
+        excerpt: (text(row.dato_documental) ?? '').slice(0, MAX_EXCERPT_CHARS),
+        rawValue: numberOrNull(ev?.valor) ?? text(ev?.valor_texto),
+        unit: text(ev?.unidad),
+        condition: text(ev?.contexto),
+        method: text(ev?.metodo_ensayo ?? ev?.metodo),
+        sourceType: text(ev?.tipoDocumento),
+        confidence: numberOrNull(ev?.confianza),
+      });
+    }
   } catch {
-    warnings.push('No se pudo consultar propiedades_extraidas; puede no existir o tener otra versión de esquema.');
+    warnings.push('No se pudo consultar nd_datos_entidad; confirma que el esquema ND esté desplegado en la cuenta Turso IA.');
   }
 
   const deduplicated = new Map<string, TursoEvidenceCandidate>();
