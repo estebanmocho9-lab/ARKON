@@ -48,7 +48,7 @@ export function detectProductFamily(name: string): AIProductFamily | null {
   if (/\bmdf\b|medium density (fibre|fiber)board|tablero.{0,35}densidad media|mueble.{0,20}mdf/.test(normalized)) return 'mdf';
   if (/yeso|gypsum|plasterboard|drywall|placa.{0,35}antihumedad/.test(normalized)) return 'gypsum';
   if (/hormigon|concrete|bloque.{0,20}cemento|masonry unit/.test(normalized)) return 'concrete';
-  return null;
+  return 'general';
 }
 
 function parseModelJson(text: string): Record<string, any> | null {
@@ -148,6 +148,7 @@ function candidateFamilies(): Record<AIProductFamily, string[]> {
     mdf: ['MDF', 'tablero MDF', 'tablero de fibras de densidad media', 'medium density fibreboard', 'medium density fiberboard'],
     gypsum: ['yeso', 'placa de yeso', 'placa antihumedad', 'gypsum board', 'moisture resistant gypsum board', 'plasterboard'],
     concrete: ['hormigón', 'hormigon', 'bloque de hormigón', 'bloque de concreto', 'concrete block', 'concrete masonry unit'],
+    general: [],
   };
 }
 
@@ -174,7 +175,7 @@ function noEvidenceResult(profile: AINeuronProfile, family: AIProductFamily, sta
 async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, family: AIProductFamily): Promise<AINeuronRunResult> {
   const profile = neuron.profile;
   const stateCode = boundedText(input.stateCode, 32) || null;
-  const search = await searchTursoEvidence(family, input.productName, profile);
+  const search = await searchTursoEvidence(family, input.productName, profile, input.materialId ?? null, input.stateName ?? null);
   if (!search.configured) {
     return { agentId: profile.id, name: profile.name, attribute: profile.attribute, status: 'turso_not_configured', nucleus: profile.nucleus, connectedNeuronIds: profile.cables.map(c => c.neuronId), selectedState: stateCode, evidence: [], assessment: null, message: search.warnings[0] };
   }
@@ -217,23 +218,64 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   }
 }
 
+function normalizeNeuronKey(value: string): string {
+  return value.trim().toLowerCase().replace(/^ai-/, '').replace(/-inv$/, '').replace(/_/g, '');
+}
+
+/** Resolve a requested root plus every direct-neuron dependency in its cables/subcables. */
+function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIProductFamily): AgenticNeuron[] {
+  const byId = new Map<string, AgenticNeuron>();
+  const byProperty = new Map<string, AgenticNeuron>();
+  for (const neuron of DIRECT_AI_NEURONS) {
+    byId.set(normalizeNeuronKey(neuron.id), neuron);
+    byId.set(normalizeNeuronKey(neuron.sourceNeuronId), neuron);
+    byProperty.set(neuron.propertyName.toLowerCase(), neuron);
+  }
+  const roots = requestedIds?.length ? requestedIds : DIRECT_AI_NEURONS.map(n => n.id);
+  const selected = new Map<string, AgenticNeuron>();
+  const queue: AgenticNeuron[] = [];
+  for (const raw of roots) {
+    const key = normalizeNeuronKey(raw);
+    const neuron = byId.get(key) ?? byProperty.get(raw.toLowerCase());
+    if (neuron && (family === 'general' || neuron.profile.appliesTo.includes(family))) queue.push(neuron);
+  }
+  while (queue.length) {
+    const neuron = queue.shift()!;
+    if (selected.has(neuron.id)) continue;
+    selected.set(neuron.id, neuron);
+    const dependencies = [
+      ...neuron.profile.cables.filter(c => c.orientation === 'direct').map(c => c.neuronId),
+      ...neuron.profile.subCables.flatMap(c => c.requiredProperties),
+    ];
+    for (const dependency of dependencies) {
+      const key = normalizeNeuronKey(dependency);
+      const connected = byId.get(key) ?? byProperty.get(dependency.toLowerCase());
+      if (connected && (family === 'general' || connected.profile.appliesTo.includes(family)) && !selected.has(connected.id)) queue.push(connected);
+    }
+  }
+  return [...selected.values()];
+}
+
 export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<AINeuronAnalysisResponse> {
-  const family = input.family || detectProductFamily(input.productName);
-  if (!family) {
+  const family = input.family || detectProductFamily(input.productName) || 'general';
+  const requested = input.neuronIds?.map(id => String(id).trim()).filter(Boolean);
+  const neurons = selectConnectedNeurons(requested, family);
+  if (!neurons.length) {
     return {
-      enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: null,
-      product: boundedText(input.productName, 160), state: { code: input.stateCode ?? null, name: input.stateName ?? null, explicitlyProvided: Boolean(input.stateCode || input.stateName) },
-      readOnly: true, writesToSupabase: false, availableDirectAgentCount: DIRECT_AI_NEURONS.length, activeAgentIds: [],
-      message: 'Producto fuera de las familias piloto habilitadas: MDF, yeso o bloque de hormigón.', agents: [],
+      enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: family,
+      product: boundedText(input.productName, 160),
+      state: { code: input.stateCode ?? null, name: input.stateName ?? null, explicitlyProvided: Boolean(input.stateCode || input.stateName) },
+      readOnly: true, writesToSupabase: false, availableDirectAgentCount: DIRECT_AI_NEURONS.length,
+      activeAgentIds: [], message: 'No se encontró una neurona raíz válida ni sus conexiones para la solicitud.', agents: [],
     };
   }
-  const requested = input.neuronIds?.map(id => String(id).trim()).filter(Boolean);
-  const selectedIds = requested?.length ? requested : DEFAULT_DEMO_AI_NEURON_IDS;
-  const selected = new Set(selectedIds);
-  const neurons = DIRECT_AI_NEURONS
-    .filter(neuron => neuron.profile.appliesTo.includes(family) && (selected.has(neuron.id) || selected.has(neuron.sourceNeuronId)))
-    .slice(0, 12);
-  const agents = await Promise.all(neurons.map(neuron => runProfile(neuron, input, family)));
+  const agents: AINeuronRunResult[] = [];
+  // Bounded concurrency prevents a 50-neuron network from flooding the Llama provider.
+  const concurrency = 4;
+  for (let index = 0; index < neurons.length; index += concurrency) {
+    const batch = neurons.slice(index, index + concurrency);
+    agents.push(...await Promise.all(batch.map(neuron => runProfile(neuron, input, family))));
+  }
   return {
     enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: family,
     product: boundedText(input.productName, 160),
