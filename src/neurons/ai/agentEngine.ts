@@ -192,7 +192,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   const usableTriz = relevantContextRows(input.scientificContext?.triz, profile);
   const payload = {
     product: { name: boundedText(input.productName, 160), id: input.productId ?? null, materialId: input.materialId ?? null, family, knownAliases: candidateFamilies()[family] },
-    requestedState: { code: stateCode, name: boundedText(input.stateName, 100) || null, explicitlyProvided: Boolean(stateCode || input.stateName) },
+    requestedState: { code: stateCode, name: boundedText(stateName, 100) || null, explicitlyProvided: Boolean(stateCode || stateName) },
     neuron: {
       id: profile.id, attribute: profile.attribute, nucleus: profile.nucleus,
       sourceNeuron: profile.sourceNeuron ?? null,
