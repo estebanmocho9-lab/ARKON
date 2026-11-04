@@ -58,7 +58,7 @@ export async function runAINeuronCalculations(input: AINeuronCalculationInput): 
       n.propertyName.toLowerCase() === raw.trim().toLowerCase()
     );
   }).filter((neuron): neuron is typeof DIRECT_AI_NEURONS[number] => Boolean(neuron));
-  const unique = [...new Map(selected.map(neuron => [neuron.id, neuron])).values()];
+  const unique = [...new Map(selected.map(neuron => [neuron.id, neuron] as const)).values()];
   if (!unique.length) throw new Error('No se reconocieron neuronas directas solicitadas.');
   const { data: material } = await supabase.from('catalogo_materiales')
     .select('nombre, nombre_en, sinonimos').eq('id_material', input.materialId).maybeSingle();
