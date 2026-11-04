@@ -1,5 +1,5 @@
 import { runAINeuronAgents, AINeuronAnalysisInput, AINeuronAnalysisResponse } from './agentEngine';
-import { DIRECT_AI_NEURONS } from './neurons';
+import { DEFAULT_DEMO_AI_NEURON_IDS, DIRECT_AI_NEURONS } from './neurons';
 import { LlamaTursoDataProvider } from './llamaTursoDataProvider';
 import type { NeuronOutput, EstadoMaterial } from '../base/tipos';
 import { supabase } from '../../supabase/client';
@@ -49,7 +49,7 @@ export async function runAINeuronCalculations(input: AINeuronCalculationInput): 
   const state: EstadoMaterial =
     input.stateCode === 'E02' || input.stateCode === 'E03' ? input.stateCode : 'E01';
   const normalize = (value: string) => value.trim().toLowerCase().replace(/^ai-/, '').replace(/_/g, '-');
-  const requested = input.neuronIds?.length ? input.neuronIds : DIRECT_AI_NEURONS.map(n => n.id);
+  const requested = input.neuronIds?.length ? input.neuronIds.slice(0, 12) : DEFAULT_DEMO_AI_NEURON_IDS;
   const selected = requested.map(raw => {
     const key = normalize(raw);
     return DIRECT_AI_NEURONS.find(n =>
