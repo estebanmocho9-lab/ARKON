@@ -72,7 +72,9 @@ export abstract class NeuronBase {
       const anomaliasConsistencia = this.verificarConsistencia(valorCompuesto, inverso, metodoUsado);
       anomalias.push(...anomaliasConsistencia);
 
-      this.guardarMemoria(input, valorCompuesto, inverso, anomalias, componentesUsados, indicesIntermedios).catch(e => console.warn(e));
+      if (input.persistMemory !== false) {
+        this.guardarMemoria(input, valorCompuesto, inverso, anomalias, componentesUsados, indicesIntermedios).catch(e => console.warn(e));
+      }
 
       return {
         neuronId: this.neuronId,
