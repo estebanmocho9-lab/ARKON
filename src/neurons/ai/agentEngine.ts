@@ -121,7 +121,9 @@ function normalizeAssessment(raw: Record<string, any>, evidence: TursoEvidenceCa
   if ((decision === 'supported' || decision === 'rejected' || decision === 'conflicting') && selectedEvidenceIds.length === 0) {
     decision = 'insufficient_evidence';
   }
-  const numeric = raw.extractedValue === null || raw.extractedValue === undefined ? null : Number(raw.extractedValue);
+  const rawNumeric = raw.extractedValue;
+  const numeric = rawNumeric === null || rawNumeric === undefined || (typeof rawNumeric === 'string' && !rawNumeric.trim())
+    ? null : Number(rawNumeric);
   const numericEvidence = numeric !== null && Number.isFinite(numeric)
     ? selectedEvidenceIds.map(id => evidence.find(item => item.id === id)).find(candidate => {
       const candidateValue = Number(candidate?.rawValue);
@@ -215,7 +217,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
       return { agentId: profile.id, name: profile.name, attribute: profile.attribute, status: 'error', nucleus: profile.nucleus, connectedNeuronIds: profile.cables.map(c => c.neuronId), selectedState: stateCode, evidence: search.evidence, assessment: null, message: 'Llama respondió, pero el resultado no cumplió el formato JSON esperado.' };
     }
     const assessment = normalizeAssessment(parsed, search.evidence);
-    const status = assessment.decision === 'insufficient_evidence' || assessment.stateMatch !== 'matches' ? 'needs_review' : 'analyzed';
+    const status = assessment.decision === 'supported' && assessment.stateMatch === 'matches' ? 'analyzed' : 'needs_review';
     return { agentId: profile.id, name: profile.name, attribute: profile.attribute, status, nucleus: profile.nucleus, connectedNeuronIds: profile.cables.map(c => c.neuronId), selectedState: stateCode, evidence: search.evidence, assessment };
   } catch (error: any) {
     if (error instanceof LlamaNotConfiguredError) {
