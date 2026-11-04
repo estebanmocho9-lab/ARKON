@@ -125,11 +125,57 @@ app.post('/api/analizar', async (req, res) => {
       return res.status(422).json({ ok: false, error: `material_id inválido: "${materialId}". NORMALIZACION usa IDs M.xxx.`, producto: { id: product.id, nombre: product.nombre, materialId } });
     }
 
-    const vector = await getVectorFromSheet(materialId);
-    if (!vector) return res.status(422).json({ ok: false, error: `No existe vector real en NORMALIZACION para ${materialId}.`, producto: { id: product.id, nombre: product.nombre, materialId } });
-
     const contexto = typeof req.body?.contexto === 'string' && req.body.contexto.trim() ? req.body.contexto.trim().toLowerCase() : 'general';
     const estado = typeof req.body?.estado === 'string' ? req.body.estado : undefined;
+
+    // Modalidad IA autónoma: no ejecuta el motor anterior ni lee Google Sheets.
+    // El broker servidor consulta Turso dedicado y Llama coordina las neuronas clonadas.
+    if (req.body?.includeAiNeurons === true) {
+      const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+      const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+      const expectedBytes = Buffer.from(expectedToken ?? '');
+      const providedBytes = Buffer.from(providedToken);
+      const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+      const authorized = process.env.NODE_ENV !== 'production' ? (!expectedToken || tokenMatches) : tokenMatches;
+      if (!authorized) return res.status(401).json({ ok: false, error: 'Modalidad IA no autorizada.' });
+
+      const [rulesResult, formulasResult, crossesResult, trizResult] = await Promise.all([
+        supabase.from('reglas_mejora').select('*').limit(300),
+        supabase.from('scientific_formulas').select('*').limit(500),
+        supabase.from('cruces_cientificos').select('*').eq('activo', true).limit(300),
+        supabase.from('triz_contradicciones').select('*').eq('activo', true).limit(500),
+      ]);
+      const neuronIds = Array.isArray(req.body?.neuronIds)
+        ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string')
+        : (typeof req.body?.propertyName === 'string' ? [req.body.propertyName] : undefined);
+      const aiNeurons = await analyzeWithLlamaMotherBrain({
+        productName: product.nombre,
+        productId: product.id,
+        materialId,
+        stateCode: estado ?? null,
+        stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : (typeof req.body?.stateName === 'string' ? req.body.stateName : null),
+        neuronIds,
+        currentProperties: {},
+        scientificContext: {
+          rules: rulesResult.data ?? [],
+          formulas: formulasResult.data ?? [],
+          scientificCrosses: crossesResult.data ?? [],
+          triz: trizResult.data ?? [],
+        },
+      });
+      return res.json({
+        ok: true,
+        motor: 'ARKON AI · Llama + Turso dedicado',
+        fuente: 'Turso ND dedicado + Supabase científico',
+        modalidad: 'ai-neurons',
+        producto: { id: product.id, nombre: product.nombre, materialId, contexto },
+        neuronasIA: aiNeurons,
+        resultado: aiNeurons,
+      });
+    }
+
+    const vector = await getVectorFromSheet(materialId);
+    if (!vector) return res.status(422).json({ ok: false, error: `No existe vector real en NORMALIZACION para ${materialId}.`, producto: { id: product.id, nombre: product.nombre, materialId } });
 
     const activacion = await activarNeuronas(materialId, 'general', estado);
 
