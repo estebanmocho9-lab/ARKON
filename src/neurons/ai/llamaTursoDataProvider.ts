@@ -14,7 +14,7 @@ function parseJson(raw: string): Record<string, unknown> | null {
 }
 
 function isExplicitArkonNormalizedUnit(unit: string | null): boolean {
-  return Boolean(unit && /(?:arkon\s*)?(?:indice|índice)?\s*0\s*[-–]\s*100|normalizad[oa](?:\s+arkon)?/i.test(unit));
+  return Boolean(unit && /0\\s*[-–]\\s*100/i.test(unit));
 }
 
 function profileFor(propertyName: string): AINeuronProfile {
