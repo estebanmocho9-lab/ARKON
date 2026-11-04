@@ -175,7 +175,12 @@ function noEvidenceResult(profile: AINeuronProfile, family: AIProductFamily, sta
 async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, family: AIProductFamily): Promise<AINeuronRunResult> {
   const profile = neuron.profile;
   const stateCode = boundedText(input.stateCode, 32) || null;
-  const search = await searchTursoEvidence(family, input.productName, profile, input.materialId ?? null, input.stateName ?? null);
+  const stateName = input.stateName?.trim() || ({
+    E01: 'comercial inicial',
+    E02: 'fraguado seco',
+    E03: 'degradado',
+  } as Record<string, string>)[stateCode ?? ''] || null;
+  const search = await searchTursoEvidence(family, input.productName, profile, input.materialId ?? null, stateName);
   if (!search.configured) {
     return { agentId: profile.id, name: profile.name, attribute: profile.attribute, status: 'turso_not_configured', nucleus: profile.nucleus, connectedNeuronIds: profile.cables.map(c => c.neuronId), selectedState: stateCode, evidence: [], assessment: null, message: search.warnings[0] };
   }
