@@ -84,7 +84,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
 
     const payload = {
       task: 'Seleccionar un dato ya normalizado por ARKON. No calcular, estimar ni convertir unidades.',
-      required: { materialId, materialName: this.materialName, propertyName, state: estado, normalizedScale: '0-100' },
+      required: { materialId, materialName, propertyName, state: estado, normalizedScale: '0-100' },
       candidates: search.evidence.map(item => ({
         id: item.id, material: item.material, property: item.property, rawValue: item.rawValue,
         unit: item.unit, condition: item.condition, method: item.method, document: item.document,
