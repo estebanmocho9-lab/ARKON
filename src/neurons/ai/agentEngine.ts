@@ -87,6 +87,13 @@ function safeContextRows(value: unknown): unknown[] {
   });
 }
 
+function safeComposition(value: unknown): unknown {
+  if (typeof value === 'string') return boundedText(value, 3000);
+  if (Array.isArray(value)) return safeContextRows(value.slice(0, 20));
+  if (value && typeof value === 'object') return safeContextRows([value])[0];
+  return null;
+}
+
 function relevantContextRows(value: unknown, profile: AINeuronProfile): unknown[] {
   if (!Array.isArray(value)) return [];
   const terms = [...profile.cables.map(c => c.propertyName), ...profile.subCables.flatMap(c => [c.id, c.purpose, ...c.requiredProperties])]
@@ -196,7 +203,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   const usableCrosses = relevantContextRows(input.scientificContext?.scientificCrosses, profile);
   const usableTriz = relevantContextRows(input.scientificContext?.triz, profile);
   const payload = {
-    product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, composition: input.composition ?? null, family, knownAliases: candidateFamilies()[family] },
+    product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, composition: safeComposition(input.composition), family, knownAliases: candidateFamilies()[family] },
     requestedState: { code: stateCode, name: boundedText(stateName, 100) || null, explicitlyProvided: Boolean(stateCode || stateName) },
     neuron: {
       id: profile.id, attribute: profile.attribute, nucleus: profile.nucleus,
