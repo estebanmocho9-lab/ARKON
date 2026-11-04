@@ -273,7 +273,9 @@ export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<A
     materialName = String(data?.nombre ?? '').trim();
   }
   const resolvedInput = { ...input, materialName: materialName || null };
-  const family = input.family || detectProductFamily(input.productName) || (materialName ? detectProductFamily(materialName) : null) || 'general';
+  const productFamily = detectProductFamily(input.productName);
+  const materialFamily = materialName ? detectProductFamily(materialName) : null;
+  const family = input.family || (productFamily !== 'general' ? productFamily : materialFamily) || 'general';
   const requested = resolvedInput.neuronIds?.map(id => String(id).trim()).filter(Boolean);
   const neurons = selectConnectedNeurons(requested, family);
   if (!neurons.length) {
