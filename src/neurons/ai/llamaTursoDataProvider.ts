@@ -1,8 +1,8 @@
 import type { NeuronDataProvider, NeuronDataVector, EstadoMaterial } from '../base/tipos';
 import { DIRECT_AI_NEURONS } from './neurons';
 import { searchTursoEvidence } from './tursoEvidence';
-import { requestLlamaAssessment, LlamaNotConfiguredError } from './llamaClient';
-import type { AINeuronProfile, AIProductFamily, TursoEvidenceCandidate } from './types';
+import { requestLlamaAssessment } from './llamaClient';
+import type { AINeuronProfile, AIProductFamily } from './types';
 
 function parseJson(raw: string): Record<string, unknown> | null {
   const cleaned = raw.trim().replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\s*\x60\x60\x60$/, '');
@@ -59,7 +59,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
 
     const profile = profileFor(propertyName);
     const search = await searchTursoEvidence(
-      this.family, this.materialName, profile, materialId, this.stateName || estado,
+      this.family, this.materialName, profile, materialId, this.stateName || (estado === 'E01' ? 'polvo' : estado === 'E02' ? 'fraguado' : 'degradado'),
     );
     if (!search.configured || search.evidence.length === 0) {
       this.cache.set(key, null);
