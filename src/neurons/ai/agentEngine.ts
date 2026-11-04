@@ -1,5 +1,5 @@
 import { AgenticNeuron } from './agenticNeuron';
-import { DIRECT_AI_NEURONS, DEFAULT_DEMO_AI_NEURON_IDS } from './neurons';
+import { DIRECT_AI_NEURONS } from './neurons';
 import { requestLlamaAssessment, LlamaNotConfiguredError } from './llamaClient';
 import { searchTursoEvidence } from './tursoEvidence';
 import {
