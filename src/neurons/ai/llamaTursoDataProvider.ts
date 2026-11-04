@@ -101,8 +101,16 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const value = Number(parsed?.value);
     const exactCandidateValue = candidate?.rawValue === null || candidate?.rawValue === undefined
       ? NaN : Number(candidate.rawValue);
+    const normalizeLabel = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const candidateMaterial = normalizeLabel(candidate?.material ?? '');
+    const requestedMaterial = normalizeLabel(materialName);
+    const materialMatches = Boolean(candidateMaterial && requestedMaterial &&
+      (candidateMaterial === requestedMaterial || candidateMaterial.includes(requestedMaterial) || requestedMaterial.includes(candidateMaterial)));
+    const candidateProperty = normalizeLabel(candidate?.property ?? '');
+    const expectedProperties = [propertyName, ...profile.evidenceTerms].map(normalizeLabel);
+    const propertyMatches = Boolean(candidateProperty && expectedProperties.some(term => term && (candidateProperty === term || candidateProperty.includes(term) || term.includes(candidateProperty))));
     const valid = Boolean(
-      candidate &&
+      candidate && materialMatches && propertyMatches &&
       Number.isFinite(value) &&
       value === exactCandidateValue &&
       value >= 0 && value <= 100 &&
