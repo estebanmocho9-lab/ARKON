@@ -45,7 +45,9 @@ export abstract class NeuronBase {
         componentesUsados = result.componentesConDato;
         anomalias.push(...result.anomalias);
       } else {
-        const valorSheet = await getValorNormalizado(input.materialId, this.propertyName, input.estado);
+        const valorSheet = input.dataProvider
+          ? await input.dataProvider.getNormalizedValue(input.materialId, this.propertyName, input.estado)
+          : await getValorNormalizado(input.materialId, this.propertyName, input.estado);
         if (valorSheet !== null && !isNaN(valorSheet)) {
           valorCompuesto = Math.min(100, Math.max(0, valorSheet));
           componentesUsados = 1;
@@ -105,7 +107,9 @@ export abstract class NeuronBase {
     const anomalias: string[] = [];
 
     for (const comp of componentes) {
-      const valor = await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
+      const valor = input.dataProvider
+        ? await input.dataProvider.getNormalizedValue(comp.materialId, this.propertyName, input.estado)
+        : await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
       if (valor === null || isNaN(valor)) {
         anomalias.push(`sin_dato_en_sheet:${comp.materialId}/${this.propertyName}`);
         continue;
@@ -257,9 +261,13 @@ export abstract class NeuronBase {
     // Cargar una sola vez el vector REAL del material. Las fórmulas científicas
     // pueden necesitar varias propiedades a la vez; no debemos asumir que
     // propiedad_a/propriedad_b son las únicas variables disponibles.
-    const vectors = await readVectorsFromSheet();
-    const materialVector = vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
-      ?? vectors.find(v => v.materialId === input.materialId);
+    const vectors = input.dataProvider
+      ? await input.dataProvider.getMaterialVector(input.materialId, input.estado)
+      : await readVectorsFromSheet();
+    const materialVector = Array.isArray(vectors)
+      ? vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
+        ?? vectors.find(v => v.materialId === input.materialId)
+      : vectors;
     const scopeBase: Record<string, number> = {};
 
     // El contexto puede aportar variables experimentales (temperatura, carga,
