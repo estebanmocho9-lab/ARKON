@@ -1,5 +1,5 @@
 import { AgenticNeuron } from './agenticNeuron';
-import { DIRECT_AI_NEURONS } from './neurons';
+import { DEFAULT_DEMO_AI_NEURON_IDS, DIRECT_AI_NEURONS } from './neurons';
 import { requestLlamaAssessment, LlamaNotConfiguredError } from './llamaClient';
 import { searchTursoEvidence } from './tursoEvidence';
 import {
@@ -231,7 +231,8 @@ function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIPr
     byId.set(normalizeNeuronKey(neuron.sourceNeuronId), neuron);
     byProperty.set(neuron.propertyName.toLowerCase(), neuron);
   }
-  const roots = requestedIds?.length ? requestedIds : DIRECT_AI_NEURONS.map(n => n.id);
+  // The demo defaults to six purpose-built agents; callers may request others explicitly.
+  const roots = requestedIds?.length ? requestedIds.slice(0, 12) : DEFAULT_DEMO_AI_NEURON_IDS;
   const selected = new Map<string, AgenticNeuron>();
   const queue: AgenticNeuron[] = [];
   for (const raw of roots) {
@@ -253,7 +254,8 @@ function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIPr
       if (connected && (family === 'general' || connected.profile.appliesTo.includes(family)) && !selected.has(connected.id)) queue.push(connected);
     }
   }
-  return [...selected.values()];
+  // Hard cap: no request can fan out to more than twelve Llama agents.
+  return [...selected.values()].slice(0, 12);
 }
 
 export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<AINeuronAnalysisResponse> {
