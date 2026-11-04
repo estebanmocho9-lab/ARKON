@@ -60,7 +60,7 @@ function materialTermsFor(family: AIProductFamily, productName: string, material
     : family === 'gypsum'
       ? ['yeso', 'placa de yeso', 'placa antihumedad de yeso', 'gypsum board', 'moisture resistant gypsum board', 'plasterboard']
       : family === 'concrete' ? ['hormigón', 'hormigon', 'bloque de hormigón', 'bloque de concreto', 'concrete block', 'concrete masonry unit'] : [];
-  return safeTerms([productName, materialId ?? '', ...common]);
+  return safeTerms([productName, ...common]);
 }
 
 function mapNDRow(row: Record<string, any>): TursoEvidenceCandidate {
