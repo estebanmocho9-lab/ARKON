@@ -165,7 +165,7 @@ async function main() {
         numberOrNull(evidence.posicionFin),
         stringOrNull(evidence.seccion),
         stringOrNull(get('clave_unica')) || `nd-sheet:${offset + synced}`,
-        stringOrNull(get('timestamp')),
+        stringOrNull(get('timestamp')) || new Date().toISOString(),
       ];
       await target.execute({
         sql: `INSERT INTO nd_hallazgos_raw (
