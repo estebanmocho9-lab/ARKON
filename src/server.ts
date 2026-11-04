@@ -1,4 +1,5 @@
 import express from 'express';
+import { timingSafeEqual } from 'crypto';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { ALL_NEURONS } from './neurons/index';
@@ -6,6 +7,7 @@ import { activarNeuronas } from './core/activationEngine';
 import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncData';
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
+import { runAINeuronAgents } from './neurons/ai/agentEngine';
 
 dotenv.config();
 
@@ -218,6 +220,48 @@ app.post('/api/analizar', async (req, res) => {
       return propsProblema.some(p => props.includes(p.toLowerCase()));
     }).slice(0, 50);
 
+    // Capa IA opcional y aditiva. El motor numérico actual y sus 100 neuronas
+    // no se reemplazan ni se modifican. El token solo autoriza esta rama.
+    let aiNeurons: any = null;
+    if (req.body?.includeAiNeurons === true) {
+      const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+      const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+      const expectedBytes = Buffer.from(expectedToken ?? '');
+      const providedBytes = Buffer.from(providedToken);
+      const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+      const authorized = process.env.NODE_ENV !== 'production'
+        ? (!expectedToken || tokenMatches)
+        : tokenMatches;
+
+      if (!authorized) {
+        aiNeurons = {
+          enabled: true, status: 'unauthorized', provider: 'Cloudflare Workers AI',
+          readOnly: true, writesToSupabase: false,
+          message: 'La rama de neuronas IA requiere el token servidor-a-servidor configurado en ARKON y Vercel.',
+        };
+      } else {
+        const currentProperties: Record<string, unknown> = {};
+        for (const n of activacion.neuronasActivadas) {
+          currentProperties[n.propertyName] = { value: n.valorCompuesto, confidence: n.confianza, neuronId: n.neuronId };
+        }
+        aiNeurons = await runAINeuronAgents({
+          productName: product.nombre,
+          productId: product.id,
+          materialId,
+          stateCode: estado ?? null,
+          stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : (typeof req.body?.stateName === 'string' ? req.body.stateName : null),
+          neuronIds: Array.isArray(req.body?.neuronIds) ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 12) : undefined,
+          currentProperties,
+          scientificContext: {
+            rules: [...(reglas ?? []), ...(mejoras ?? [])],
+            formulas: formulas ?? [],
+            scientificCrosses: cruces ?? [],
+            triz: triz ?? [],
+          },
+        });
+      }
+    }
+
     const anomalias = activacion.neuronasActivadas.flatMap((n: any) => (n.anomalias ?? []).map((a: any) => ({ neuronId: n.neuronId, propertyName: n.propertyName, detalle: String(a) })));
     const errores = [
       ...anomalias.map((a: any) => `${a.propertyName}: ${a.detalle}`),
@@ -240,6 +284,7 @@ app.post('/api/analizar', async (req, res) => {
         cruces: crucesDisponibles,
         triz: trizRelacionadas,
         analisisProblemas,
+        ...(aiNeurons ? { neuronasIA: aiNeurons } : {}),
         resumen: {
           neuronasConDatos: activacion.neuronasConDatos,
           totalNeuronas: activacion.totalNeuronas,
@@ -252,7 +297,8 @@ app.post('/api/analizar', async (req, res) => {
         },
       },
       materiales: [{ materialId, resultado: { ...activacion, errores, mejoras: mejorasReales, reglasMejora: solucionesReglas, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas } }],
-      resultado: { activacion, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas },
+      resultado: { activacion, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas, ...(aiNeurons ? { neuronasIA: aiNeurons } : {}) },
+      ...(aiNeurons ? { aiNeurons } : {}),
     });
   } catch (error) {
     console.error('POST /api/analizar:', error);
