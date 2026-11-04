@@ -105,7 +105,7 @@ export async function searchTursoEvidence(
     ['entidad_principal', 'entidad_candidata', 'dato_documental', 'texto_original', 'texto_normalizado', 'contexto'],
     materialTermsFor(family, productName, materialId),
   );
-  const propertyTerms = safeTerms([profile.corePropertyName, profile.attribute, ...profile.evidenceTerms]);
+  const propertyTerms = safeTerms([profile.corePropertyName, profile.attribute, ...profile.evidenceTerms, ...profile.cables.flatMap(cable => cable.searchTerms)]);
   const stateTerms = safeTerms([stateName ?? '']);
   const stateGroup = stateTerms.length ? likeGroup(['contexto', 'dato_documental', 'texto_original', 'texto_normalizado'], stateTerms) : { sql: '1 = 1', args: [] };
   const propertyGroup = likeGroup(
