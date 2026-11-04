@@ -1,4 +1,4 @@
-export type AIProductFamily = 'mdf' | 'gypsum' | 'concrete';
+export type AIProductFamily = 'mdf' | 'gypsum' | 'concrete' | 'general';
 export type AIEvidenceDecision = 'supported' | 'conflicting' | 'rejected' | 'insufficient_evidence';
 export type AIStateMatch = 'matches' | 'mismatch' | 'unknown';
 
