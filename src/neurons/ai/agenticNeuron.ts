@@ -1,5 +1,6 @@
 import { AINeuronProfile } from './types';
 import { NeuronBase } from '../base/NeuronBase';
+import type { NeuronInput, NeuronOutput } from '../base/tipos';
 
 /**
  * Runtime representation of one cloned direct ARKON neuron.
@@ -8,12 +9,14 @@ import { NeuronBase } from '../base/NeuronBase';
  */
 export class AgenticNeuron {
   readonly profile: AINeuronProfile;
+  private readonly sourceNeuron: NeuronBase;
 
   constructor(profile: AINeuronProfile, sourceNeuron: NeuronBase) {
     if (sourceNeuron.orientation !== 'direct') throw new Error(`La neurona IA ${profile.id} debe clonar una neurona directa.`);
     if (sourceNeuron.neuronId !== profile.coreNeuronId || sourceNeuron.propertyName !== profile.corePropertyName) {
       throw new Error(`La neurona IA ${profile.id} no coincide con su fuente ${sourceNeuron.neuronId}/${sourceNeuron.propertyName}.`);
     }
+    this.sourceNeuron = sourceNeuron;
     this.profile = {
       ...profile,
       sourceNeuron: {
@@ -39,6 +42,11 @@ export class AgenticNeuron {
 
   get propertyName(): string {
     return this.profile.corePropertyName;
+  }
+
+  /** Run the original scientific neuron unchanged, with the selected data provider. */
+  process(input: NeuronInput): Promise<NeuronOutput> {
+    return this.sourceNeuron.process(input);
   }
 
   /** Full, neuron-specific task instruction sent to the Llama mother brain. */
