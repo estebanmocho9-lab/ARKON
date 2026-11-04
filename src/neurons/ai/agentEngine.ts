@@ -2,6 +2,7 @@ import { AgenticNeuron } from './agenticNeuron';
 import { DEFAULT_DEMO_AI_NEURON_IDS, DIRECT_AI_NEURONS } from './neurons';
 import { requestLlamaAssessment, LlamaNotConfiguredError } from './llamaClient';
 import { searchTursoEvidence } from './tursoEvidence';
+import { supabase } from '../../supabase/client';
 import {
   AIEvidenceDecision, AINeuronProfile, AINeuronRunResult, AIProductFamily,
   AIStateMatch, LlamaEvidenceAssessment, TursoEvidenceCandidate,
@@ -11,6 +12,7 @@ export interface AINeuronAnalysisInput {
   productName: string;
   productId?: string | number | null;
   materialId?: string | null;
+  materialName?: string | null;
   family?: AIProductFamily | null;
   neuronIds?: string[];
   stateCode?: string | null;
@@ -180,7 +182,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
     E02: 'fraguado seco',
     E03: 'degradado',
   } as Record<string, string>)[stateCode ?? ''] || null;
-  const search = await searchTursoEvidence(family, input.productName, profile, input.materialId ?? null, stateName);
+  const search = await searchTursoEvidence(family, input.materialName?.trim() || input.productName, profile, input.materialId ?? null, stateName);
   if (!search.configured) {
     return { agentId: profile.id, name: profile.name, attribute: profile.attribute, status: 'turso_not_configured', nucleus: profile.nucleus, connectedNeuronIds: profile.cables.map(c => c.neuronId), selectedState: stateCode, evidence: [], assessment: null, message: search.warnings[0] };
   }
@@ -191,7 +193,7 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   const usableCrosses = relevantContextRows(input.scientificContext?.scientificCrosses, profile);
   const usableTriz = relevantContextRows(input.scientificContext?.triz, profile);
   const payload = {
-    product: { name: boundedText(input.productName, 160), id: input.productId ?? null, materialId: input.materialId ?? null, family, knownAliases: candidateFamilies()[family] },
+    product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, family, knownAliases: candidateFamilies()[family] },
     requestedState: { code: stateCode, name: boundedText(stateName, 100) || null, explicitlyProvided: Boolean(stateCode || stateName) },
     neuron: {
       id: profile.id, attribute: profile.attribute, nucleus: profile.nucleus,
@@ -264,14 +266,21 @@ function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIPr
 }
 
 export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<AINeuronAnalysisResponse> {
-  const family = input.family || detectProductFamily(input.productName) || 'general';
-  const requested = input.neuronIds?.map(id => String(id).trim()).filter(Boolean);
+  let materialName = input.materialName?.trim() || '';
+  if (!materialName && input.materialId) {
+    const { data } = await supabase.from('catalogo_materiales')
+      .select('nombre').eq('id_material', input.materialId).maybeSingle();
+    materialName = String(data?.nombre ?? '').trim();
+  }
+  const resolvedInput = { ...input, materialName: materialName || null };
+  const family = input.family || detectProductFamily(input.productName) || (materialName ? detectProductFamily(materialName) : null) || 'general';
+  const requested = resolvedInput.neuronIds?.map(id => String(id).trim()).filter(Boolean);
   const neurons = selectConnectedNeurons(requested, family);
   if (!neurons.length) {
     return {
       enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: family,
-      product: boundedText(input.productName, 160),
-      state: { code: input.stateCode ?? null, name: input.stateName ?? null, explicitlyProvided: Boolean(input.stateCode || input.stateName) },
+      product: boundedText(resolvedInput.productName, 160),
+      state: { code: resolvedInput.stateCode ?? null, name: resolvedInput.stateName ?? null, explicitlyProvided: Boolean(resolvedInput.stateCode || resolvedInput.stateName) },
       readOnly: true, writesToSupabase: false, availableDirectAgentCount: DIRECT_AI_NEURONS.length,
       activeAgentIds: [], message: 'No se encontró una neurona raíz válida ni sus conexiones para la solicitud.', agents: [],
     };
@@ -281,7 +290,7 @@ export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<A
   const concurrency = 4;
   for (let index = 0; index < neurons.length; index += concurrency) {
     const batch = neurons.slice(index, index + concurrency);
-    agents.push(...await Promise.all(batch.map(neuron => runProfile(neuron, input, family))));
+    agents.push(...await Promise.all(batch.map(neuron => runProfile(neuron, resolvedInput, family))));
   }
   return {
     enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: family,
