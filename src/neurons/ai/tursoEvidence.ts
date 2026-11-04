@@ -54,13 +54,13 @@ function likeGroup(columns: string[], terms: string[]): { sql: string; args: str
   return { sql: `(${clauses.join(' OR ')})`, args };
 }
 
-function materialTermsFor(family: AIProductFamily, productName: string): string[] {
+function materialTermsFor(family: AIProductFamily, productName: string, materialId?: string | null): string[] {
   const common = family === 'mdf'
     ? ['MDF', 'tablero MDF', 'mueble de MDF', 'tablero de fibras de densidad media', 'medium density fibreboard', 'medium density fiberboard']
     : family === 'gypsum'
       ? ['yeso', 'placa de yeso', 'placa antihumedad de yeso', 'gypsum board', 'moisture resistant gypsum board', 'plasterboard']
-      : ['hormigón', 'hormigon', 'bloque de hormigón', 'bloque de concreto', 'concrete block', 'concrete masonry unit'];
-  return safeTerms([productName, ...common]);
+      : family === 'concrete' ? ['hormigón', 'hormigon', 'bloque de hormigón', 'bloque de concreto', 'concrete block', 'concrete masonry unit'] : [];
+  return safeTerms([productName, materialId ?? '', ...common]);
 }
 
 function mapNDRow(row: Record<string, any>): TursoEvidenceCandidate {
@@ -94,6 +94,8 @@ export async function searchTursoEvidence(
   family: AIProductFamily,
   productName: string,
   profile: AINeuronProfile,
+  materialId?: string | null,
+  stateName?: string | null,
 ): Promise<TursoSearchResult> {
   const turso = getAINeuronTursoClient();
   if (!turso) {
@@ -101,9 +103,11 @@ export async function searchTursoEvidence(
   }
   const materialGroup = likeGroup(
     ['entidad_principal', 'entidad_candidata', 'dato_documental', 'texto_original', 'texto_normalizado', 'contexto'],
-    materialTermsFor(family, productName),
+    materialTermsFor(family, productName, materialId),
   );
-  const propertyTerms = safeTerms([...profile.evidenceTerms, ...profile.cables.flatMap(c => c.searchTerms)]);
+  const propertyTerms = safeTerms([profile.corePropertyName, profile.attribute, ...profile.evidenceTerms]);
+  const stateTerms = safeTerms([stateName ?? '']);
+  const stateGroup = stateTerms.length ? likeGroup(['contexto', 'dato_documental', 'texto_original', 'texto_normalizado'], stateTerms) : { sql: '1 = 1', args: [] };
   const propertyGroup = likeGroup(
     ['aspecto', 'campo', 'tipo', 'dato_documental', 'texto_original', 'texto_normalizado', 'contexto'],
     propertyTerms,
@@ -119,9 +123,9 @@ export async function searchTursoEvidence(
                    aspecto, dato_documental, valor, valor_texto, unidad, contexto, confianza,
                    evidencia_json, metadatos_json, documento_drive_id, pagina, seccion
             FROM nd_hallazgos_raw
-            WHERE ${materialGroup.sql} AND ${propertyGroup.sql}
+            WHERE ${materialGroup.sql} AND ${propertyGroup.sql} AND ${stateGroup.sql}
             ORDER BY confianza DESC, pagina ASC LIMIT ?`,
-      args: [...materialGroup.args, ...propertyGroup.args, MAX_EVIDENCE],
+      args: [...materialGroup.args, ...propertyGroup.args, ...stateGroup.args, MAX_EVIDENCE],
     });
     tablesRead.push('nd_hallazgos_raw');
     evidence.push(...result.rows.map((r: any) => mapNDRow(r as Record<string, any>)));
@@ -130,17 +134,18 @@ export async function searchTursoEvidence(
   }
 
   try {
-    const materialTerms = materialTermsFor(family, productName);
+    const materialTerms = materialTermsFor(family, productName, materialId);
     const materialMatch = likeGroup(['e.entidad', 'd.dato_documental'], materialTerms);
     const propertyMatch = likeGroup(['d.aspecto', 'd.dato_documental'], propertyTerms);
+    const dataStateMatch = stateTerms.length ? likeGroup(['d.dato_documental', 'd.evidencia_json'], stateTerms) : { sql: '1 = 1', args: [] };
     const result = await turso.execute({
       sql: `SELECT d.id, d.documento_drive_id, d.pagina, d.aspecto, d.dato_documental,
                    d.evidencia_json, e.entidad AS material
             FROM nd_datos_entidad d
             LEFT JOIN nd_entidades_documentales e ON e.clave_entidad = d.clave_entidad
-            WHERE ${materialMatch.sql} AND ${propertyMatch.sql}
+            WHERE ${materialMatch.sql} AND ${propertyMatch.sql} AND ${dataStateMatch.sql}
             ORDER BY d.pagina ASC LIMIT ?`,
-      args: [...materialMatch.args, ...propertyMatch.args, MAX_EVIDENCE],
+      args: [...materialMatch.args, ...propertyMatch.args, ...dataStateMatch.args, MAX_EVIDENCE],
     });
     tablesRead.push('nd_datos_entidad');
     for (const row of result.rows as any[]) {
