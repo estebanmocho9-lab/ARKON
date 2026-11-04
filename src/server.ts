@@ -23,13 +23,14 @@ interface Producto {
   nombre: string;
   material_id: string;
   contexto?: string | null;
+  composicion?: unknown;
   activo?: boolean;
 }
 
 async function obtenerProductosActivos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from('productos')
-    .select('id, nombre, material_id, contexto, activo')
+    .select('id, nombre, material_id, contexto, composicion, activo')
     .eq('activo', true)
     .order('id', { ascending: true });
   if (error) throw new Error(`No se pudieron leer productos de Supabase: ${error.message}`);
@@ -226,6 +227,7 @@ app.post('/api/analizar', async (req, res) => {
         productName: product.nombre,
         productId: product.id,
         materialId,
+        composition: product.composicion ?? null,
         stateCode: estado ?? null,
         stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : (typeof req.body?.stateName === 'string' ? req.body.stateName : null),
         neuronIds,
