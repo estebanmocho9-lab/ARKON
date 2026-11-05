@@ -1,5 +1,5 @@
 import { runAINeuronAgents, AINeuronAnalysisInput, AINeuronAnalysisResponse } from './agentEngine';
-import { DEFAULT_DEMO_AI_NEURON_IDS, DIRECT_AI_NEURONS } from './neurons';
+import { DIRECT_AI_NEURONS } from './neurons';
 import { LlamaTursoDataProvider } from './llamaTursoDataProvider';
 import type { NeuronOutput, EstadoMaterial } from '../base/tipos';
 import { supabase } from '../../supabase/client';
@@ -50,17 +50,35 @@ export async function runAINeuronCalculations(input: AINeuronCalculationInput): 
     throw new Error('Debe indicarse explícitamente E01, E02 o E03; no se asigna un estado material por defecto.');
   }
   const state: EstadoMaterial = input.stateCode;
-  const normalize = (value: string) => value.trim().toLowerCase().replace(/^ai-/, '').replace(/_/g, '-');
-  const requested = input.neuronIds?.length ? input.neuronIds.slice(0, 12) : DEFAULT_DEMO_AI_NEURON_IDS;
-  const selected = requested.map(raw => {
-    const key = normalize(raw);
-    return DIRECT_AI_NEURONS.find(n =>
-      normalize(n.id) === key ||
-      normalize(n.sourceNeuronId) === key ||
-      n.propertyName.toLowerCase() === raw.trim().toLowerCase()
-    );
-  }).filter((neuron): neuron is typeof DIRECT_AI_NEURONS[number] => Boolean(neuron));
-  const unique = [...new Map(selected.map(neuron => [neuron.id, neuron] as const)).values()];
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/^ai-/, '').replace(/-inv$/, '').replace(/[_-]/g, '');
+  const byId = new Map<string, typeof DIRECT_AI_NEURONS[number]>();
+  const byProperty = new Map<string, typeof DIRECT_AI_NEURONS[number]>();
+  for (const neuron of DIRECT_AI_NEURONS) {
+    byId.set(normalize(neuron.id), neuron);
+    byId.set(normalize(neuron.sourceNeuronId), neuron);
+    byProperty.set(normalize(neuron.propertyName), neuron);
+  }
+  // A named property activates its connected network; no filter means all 50 direct neurons.
+  const roots = input.neuronIds?.length ? input.neuronIds : DIRECT_AI_NEURONS.map(neuron => neuron.id);
+  const selected = new Map<string, typeof DIRECT_AI_NEURONS[number]>();
+  const queue = roots.map(raw => byId.get(normalize(raw)) ?? byProperty.get(normalize(raw))).filter(
+    (neuron): neuron is typeof DIRECT_AI_NEURONS[number] => Boolean(neuron),
+  );
+  while (queue.length) {
+    const neuron = queue.shift()!;
+    if (selected.has(neuron.id)) continue;
+    selected.set(neuron.id, neuron);
+    const dependencies = [
+      ...neuron.profile.cables.filter(cable => cable.orientation === 'direct').map(cable => cable.neuronId),
+      ...(neuron.profile.sourceNeuron?.relatedProperties ?? []),
+      ...neuron.profile.subCables.flatMap(cable => cable.requiredProperties),
+    ];
+    for (const dependency of dependencies) {
+      const connected = byId.get(normalize(dependency)) ?? byProperty.get(normalize(dependency));
+      if (connected && !selected.has(connected.id)) queue.push(connected);
+    }
+  }
+  const unique = [...selected.values()];
   if (!unique.length) throw new Error('No se reconocieron neuronas directas solicitadas.');
   const { data: material } = await supabase.from('catalogo_materiales')
     .select('nombre, nombre_en, sinonimos').eq('id_material', input.materialId).maybeSingle();
