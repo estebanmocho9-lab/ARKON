@@ -7,7 +7,7 @@ import { activarNeuronas } from './core/activationEngine';
 import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncData';
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
-import { analyzeWithLlamaMotherBrain, runAINeuronCalculations } from './neurons/ai/motherBrain';
+import { analyzeWithLlamaMotherBrain, runAINeuronCalculations, llamaMotherBrain } from './neurons/ai/motherBrain';
 import { getAINeuronTursoClient } from './neurons/ai/aiTursoClient';
 
 dotenv.config();
@@ -146,6 +146,34 @@ app.post('/api/analizar-llama-turso', async (req, res) => {
   } catch (error) {
     console.error('POST /api/analizar-llama-turso:', error);
     return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post('/api/ai/llama/test', async (req, res) => {
+  const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+  const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+  const expectedBytes = Buffer.from(expectedToken ?? '');
+  const providedBytes = Buffer.from(providedToken);
+  const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+  if (!tokenMatches) {
+    return res.status(expectedToken ? 401 : 503).json({
+      ok: false,
+      error: expectedToken ? 'Prueba de conexión no autorizada.' : 'Falta configurar ARKON_BRIDGE_TOKEN en el backend.',
+    });
+  }
+
+  try {
+    // Esta ruta prueba exclusivamente la comunicación cerebro madre ↔ Llama.
+    // No consulta Turso, Supabase ni activa neuronas.
+    const result = await llamaMotherBrain.testLlamaConnection();
+    return res.json({ ok: true, stage: 'mother-brain-to-llama', ...result });
+  } catch (error) {
+    console.error('POST /api/ai/llama/test:', error);
+    return res.status(502).json({
+      ok: false,
+      stage: 'mother-brain-to-llama',
+      error: error instanceof Error ? error.message : 'No se pudo establecer comunicación con Llama.',
+    });
   }
 });
 
