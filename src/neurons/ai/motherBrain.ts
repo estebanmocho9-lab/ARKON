@@ -3,6 +3,7 @@ import { DIRECT_AI_NEURONS } from './neurons';
 import { LlamaTursoDataProvider } from './llamaTursoDataProvider';
 import type { NeuronOutput, EstadoMaterial } from '../base/tipos';
 import { supabase } from '../../supabase/client';
+import { requestLlamaAssessment } from './llamaClient';
 
 /**
  * Shared Llama mother brain. It is invoked on each authorized ARKON analysis,
@@ -11,6 +12,19 @@ import { supabase } from '../../supabase/client';
  * on the server; neither a neuron nor the model receives database credentials.
  */
 export class LlamaMotherBrain {
+  /**
+   * Direct communication test between the mother brain and Cloudflare Workers AI.
+   * This deliberately does not access Turso, Supabase, or any neuron.
+   */
+  async testLlamaConnection(): Promise<{ connected: true; provider: 'Cloudflare Workers AI'; model: string; response: string }> {
+    const model = process.env.CLOUDFLARE_MODEL?.trim() || '@cf/meta/llama-3.2-3b-instruct';
+    const response = await requestLlamaAssessment(
+      'Eres Llama, conectado directamente al cerebro madre de ARKON. Esta es únicamente una prueba de comunicación. No consultes bases de datos ni ejecutes cálculos. Confirma brevemente que recibiste el mensaje del cerebro madre.',
+      { type: 'brain_llama_connection_test', source: 'ARKON mother brain', instruction: 'Confirmar recepción del mensaje.' },
+    );
+    return { connected: true, provider: 'Cloudflare Workers AI', model, response };
+  }
+
   async analyze(input: AINeuronAnalysisInput): Promise<AINeuronAnalysisResponse> {
     return runAINeuronAgents(input);
   }
