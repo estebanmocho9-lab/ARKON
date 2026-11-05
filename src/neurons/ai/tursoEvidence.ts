@@ -8,7 +8,7 @@ export interface TursoSearchResult {
   warnings: string[];
 }
 
-const MAX_TERMS = 16;
+const MAX_TERMS = 48;
 const MAX_EVIDENCE = 10;
 const MAX_EXCERPT_CHARS = 1600;
 
@@ -110,7 +110,14 @@ export async function searchTursoEvidence(
     ['entidad_principal', 'entidad_candidata', 'dato_documental', 'texto_original', 'texto_normalizado', 'contexto'],
     materialTermsFor(family, productName, materialId),
   );
-  const propertyTerms = safeTerms([profile.corePropertyName, profile.attribute, ...profile.evidenceTerms, ...profile.cables.flatMap(cable => cable.searchTerms)]);
+  const propertyTerms = safeTerms([
+    profile.corePropertyName,
+    ...profile.cables.map(cable => cable.propertyName),
+    ...profile.subCables.flatMap(cable => cable.requiredProperties),
+    profile.attribute,
+    ...profile.evidenceTerms,
+    ...profile.cables.flatMap(cable => cable.searchTerms),
+  ]);
   const stateTerms = safeTerms([stateName ?? '']);
   const stateGroup = stateTerms.length ? likeGroup(['contexto', 'dato_documental', 'texto_original', 'texto_normalizado'], stateTerms) : { sql: '1 = 1', args: [] };
   const propertyGroup = likeGroup(
