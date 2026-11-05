@@ -7,8 +7,8 @@ dotenv.config();
 import * as fs from 'fs';
 import * as path from 'path';
 import { getAINeuronTursoClient } from '../../neurons/ai/aiTursoClient';
-import { prepararSheetsND, sheets } from './ndSheetsPersistence';
-import { getNDSpreadsheetId } from './ndSheetsConnection';
+import { prepararSheetsND } from './ndSheetsPersistence';
+import { getNDSpreadsheetId, sheets } from './ndSheetsConnection';
 
 const TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS nd_hallazgos_raw (
