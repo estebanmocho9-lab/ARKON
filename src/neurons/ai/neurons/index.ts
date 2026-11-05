@@ -106,11 +106,3 @@ export const DIRECT_AI_NEURONS: AgenticNeuron[] = [
 ];
 
 export const AI_NEURON_PROFILES: AINeuronProfile[] = DIRECT_AI_NEURONS.map(neuron => neuron.profile);
-export const DEFAULT_DEMO_AI_NEURON_IDS = [
-  "AI-N-004",
-  "AI-N-018",
-  "AI-N-002",
-  "AI-N-021",
-  "AI-N-013",
-  "AI-N-014"
-];
