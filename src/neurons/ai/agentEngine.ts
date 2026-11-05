@@ -1,5 +1,5 @@
 import { AgenticNeuron } from './agenticNeuron';
-import { DEFAULT_DEMO_AI_NEURON_IDS, DIRECT_AI_NEURONS } from './neurons';
+import { DIRECT_AI_NEURONS } from './neurons';
 import { requestLlamaAssessment, LlamaNotConfiguredError } from './llamaClient';
 import { searchTursoEvidence } from './tursoEvidence';
 import { supabase } from '../../supabase/client';
@@ -239,8 +239,8 @@ function normalizeNeuronKey(value: string): string {
   return value.trim().toLowerCase().replace(/^ai-/, '').replace(/-inv$/, '').replace(/_/g, '');
 }
 
-/** Resolve a requested root plus every direct-neuron dependency in its cables/subcables. */
-function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIProductFamily): AgenticNeuron[] {
+/** Resolve requested property roots and traverse the complete direct-neuron network. */
+function selectConnectedNeurons(requestedIds?: string[]): AgenticNeuron[] {
   const byId = new Map<string, AgenticNeuron>();
   const byProperty = new Map<string, AgenticNeuron>();
   for (const neuron of DIRECT_AI_NEURONS) {
@@ -248,14 +248,14 @@ function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIPr
     byId.set(normalizeNeuronKey(neuron.sourceNeuronId), neuron);
     byProperty.set(neuron.propertyName.toLowerCase(), neuron);
   }
-  // The demo defaults to six purpose-built agents; callers may request others explicitly.
-  const roots = requestedIds?.length ? requestedIds.slice(0, 12) : DEFAULT_DEMO_AI_NEURON_IDS;
+  // Without a property filter, perform a complete product scan across all 50 direct neurons.
+  const roots = requestedIds?.length ? requestedIds : DIRECT_AI_NEURONS.map(neuron => neuron.id);
   const selected = new Map<string, AgenticNeuron>();
   const queue: AgenticNeuron[] = [];
   for (const raw of roots) {
     const key = normalizeNeuronKey(raw);
     const neuron = byId.get(key) ?? byProperty.get(raw.toLowerCase());
-    if (neuron && (family === 'general' || neuron.profile.appliesTo.includes(family))) queue.push(neuron);
+    if (neuron) queue.push(neuron);
   }
   while (queue.length) {
     const neuron = queue.shift()!;
@@ -263,16 +263,16 @@ function selectConnectedNeurons(requestedIds: string[] | undefined, family: AIPr
     selected.set(neuron.id, neuron);
     const dependencies = [
       ...neuron.profile.cables.filter(c => c.orientation === 'direct').map(c => c.neuronId),
+      ...(neuron.profile.sourceNeuron?.relatedProperties ?? []),
       ...neuron.profile.subCables.flatMap(c => c.requiredProperties),
     ];
     for (const dependency of dependencies) {
       const key = normalizeNeuronKey(dependency);
       const connected = byId.get(key) ?? byProperty.get(dependency.toLowerCase());
-      if (connected && (family === 'general' || connected.profile.appliesTo.includes(family)) && !selected.has(connected.id)) queue.push(connected);
+      if (connected && !selected.has(connected.id)) queue.push(connected);
     }
   }
-  // Hard cap: no request can fan out to more than twelve Llama agents.
-  return [...selected.values()].slice(0, 12);
+  return [...selected.values()];
 }
 
 export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<AINeuronAnalysisResponse> {
@@ -287,7 +287,7 @@ export async function runAINeuronAgents(input: AINeuronAnalysisInput): Promise<A
   const materialFamily = materialName ? detectProductFamily(materialName) : null;
   const family = input.family || (productFamily !== 'general' ? productFamily : materialFamily) || 'general';
   const requested = resolvedInput.neuronIds?.map(id => String(id).trim()).filter(Boolean);
-  const neurons = selectConnectedNeurons(requested, family);
+  const neurons = selectConnectedNeurons(requested);
   if (!neurons.length) {
     return {
       enabled: true, provider: 'Cloudflare Workers AI', model: MODEL, productFamily: family,
