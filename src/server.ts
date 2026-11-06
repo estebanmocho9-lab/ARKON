@@ -123,7 +123,21 @@ app.post('/api/analizar-llama-turso', async (req, res) => {
     const rawId = req.body?.productId ?? req.body?.material_id ?? req.body?.materialId;
     const requestedId = rawId === undefined || rawId === null ? '' : String(rawId).trim();
     if (!requestedId) return res.status(400).json({ ok: false, error: 'productId, material_id o materialId es obligatorio.' });
-    const product = await resolverProducto(requestedId);
+    let product: any = await resolverProducto(requestedId);
+    // Los componentes de una composición pueden existir en el catálogo de
+    // materiales sin tener una ficha de producto activa. El cerebro IA también
+    // debe poder analizar esos materiales por su ID científico.
+    if (!product && /^M\.\d+$/i.test(requestedId)) {
+      const { data: catalogMaterial } = await supabase.from('catalogo_materiales')
+        .select('id_material, nombre').eq('id_material', requestedId).maybeSingle();
+      if (catalogMaterial) {
+        product = {
+          id: catalogMaterial.id_material,
+          material_id: catalogMaterial.id_material,
+          nombre: catalogMaterial.nombre,
+        };
+      }
+    }
     if (!product) return res.status(404).json({ ok: false, error: 'Producto/material no encontrado en Supabase.' });
 
     const materialId = String(product.material_id ?? '').trim();
