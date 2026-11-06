@@ -149,14 +149,35 @@ app.post('/api/analizar-llama-turso', async (req, res) => {
     const neuronIds = Array.isArray(req.body?.neuronIds)
       ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string')
       : (typeof req.body?.propertyName === 'string' ? [req.body.propertyName] : undefined);
-    const result = await runAINeuronCalculations({
+    const stateCode = typeof req.body?.estado === 'string' ? req.body.estado : null;
+    const stateName = typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null;
+
+    // El cerebro madre ejecuta primero la recuperación y evaluación de evidencia:
+    // cada neurona seleccionada consulta Turso y Llama valida únicamente los
+    // fragmentos trazables. Después se ejecuta el motor científico original,
+    // sin convertir unidades físicas ni sustituir sus fórmulas.
+    const evidenceAnalysis = await analyzeWithLlamaMotherBrain({
       productName: product.nombre,
+      materialName: product.nombre,
       materialId,
-      stateCode: typeof req.body?.estado === 'string' ? req.body.estado : null,
-      stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null,
+      stateCode,
+      stateName,
       neuronIds,
     });
-    return res.json({ ok: true, modalidad: 'llama-turso-neuronas', producto: { id: product.id, nombre: product.nombre, materialId }, resultado: result });
+    const scientificCalculations = await runAINeuronCalculations({
+      productName: product.nombre,
+      materialId,
+      stateCode,
+      stateName,
+      neuronIds,
+    });
+    return res.json({
+      ok: true,
+      modalidad: 'mother-brain-llama-turso-science',
+      producto: { id: product.id, nombre: product.nombre, materialId },
+      evidenciaIA: evidenceAnalysis,
+      resultadoCientifico: scientificCalculations,
+    });
   } catch (error) {
     console.error('POST /api/analizar-llama-turso:', error);
     return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
