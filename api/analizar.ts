@@ -43,7 +43,7 @@ async function consultarCerebroIA(materialId: string, estado: string, neuronIds?
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
+  const timeout = setTimeout(() => controller.abort(), 55_000);
   try {
     const response = await fetch(`${baseUrl}/api/analizar-llama-turso`, {
       method: 'POST',
@@ -63,7 +63,7 @@ async function consultarCerebroIA(materialId: string, estado: string, neuronIds?
     return {
       materialId,
       status: 'brain_unreachable',
-      message: error?.name === 'AbortError' ? 'El cerebro madre superó el límite de 90 segundos.' : 'No se pudo establecer comunicación con el cerebro madre.',
+      message: error?.name === 'AbortError' ? 'El cerebro madre superó el límite de 55 segundos.' : 'No se pudo establecer comunicación con el cerebro madre.',
     };
   } finally {
     clearTimeout(timeout);
