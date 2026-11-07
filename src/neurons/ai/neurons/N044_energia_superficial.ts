@@ -1,6 +1,5 @@
 import { AgenticNeuron } from "../agenticNeuron";
 import type { AINeuronProfile } from "../types";
-import { N044_EnergiaSuperficial } from "../../physical/N044_energia_superficial";
 
 /** AI clone of direct ARKON neuron N-044; validates its original class at construction. */
 const definition: AINeuronProfile = {
@@ -147,10 +146,9 @@ const definition: AINeuronProfile = {
     ]
   }
 };
-const sourceNeuron = new N044_EnergiaSuperficial();
 
 export class AgentNeuronN044 extends AgenticNeuron {
-  constructor() { super(definition, sourceNeuron); }
+  constructor() { super(definition); }
 }
 
 export const AI_NEURON_N044 = new AgentNeuronN044();
