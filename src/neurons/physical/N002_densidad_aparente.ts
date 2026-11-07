@@ -104,7 +104,8 @@ const definition: AINeuronProfile = {
       "densidad_real",
       "porosidad_total",
       "absorcion_agua"
-    ]
+    ],
+    "confidenceDefault": 0.95
   }
 };
 
