@@ -409,10 +409,11 @@ app.post('/api/analizar', async (req, res) => {
       return propsProblema.some(p => props.includes(p.toLowerCase()));
     }).slice(0, 50);
 
-    // Capa IA opcional y aditiva. El motor numérico actual y sus 100 neuronas
-    // no se reemplazan ni se modifican. El token solo autoriza esta rama.
+    // Las 50 neuronas-agente son parte del análisis normal: se ejecutan junto
+    // con el motor científico, usando evidencia de Turso y contexto de Supabase.
+    // No reemplazan fórmulas ni cálculos físicos; los complementan y auditan.
     let aiNeurons: any = null;
-    if (req.body?.includeAiNeurons === true) {
+    {
       const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
       const providedToken = String(req.header('x-arkon-token') ?? '').trim();
       const expectedBytes = Buffer.from(expectedToken ?? '');
@@ -437,6 +438,7 @@ app.post('/api/analizar', async (req, res) => {
           productName: product.nombre,
           productId: product.id,
           materialId,
+          composition: product.composicion ?? null,
           stateCode: estado ?? null,
           stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : (typeof req.body?.stateName === 'string' ? req.body.stateName : null),
           neuronIds: Array.isArray(req.body?.neuronIds) ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 12) : undefined,
