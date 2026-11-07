@@ -118,7 +118,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const materialMatches = Boolean(candidateMaterial && requestedMaterial &&
       (candidateMaterial === requestedMaterial || candidateMaterial.includes(requestedMaterial) || requestedMaterial.includes(candidateMaterial)));
     const candidateProperty = normalizeLabel(candidate?.property ?? '');
-    const expectedProperties = [propertyName, ...profile.evidenceTerms].map(normalizeLabel);
+    const coreCable = profile.cables.find(cable => cable.propertyName === propertyName);
+    const expectedProperties = [propertyName, profile.attribute, coreCable?.measures ?? '', profile.sourceNeuron?.definition ?? ''].map(normalizeLabel).filter(Boolean);
     const propertyMatches = Boolean(candidateProperty && expectedProperties.some(term => term && (candidateProperty === term || candidateProperty.includes(term) || term.includes(candidateProperty))));
     const valid = Boolean(
       candidate && materialMatches && propertyMatches &&
@@ -155,7 +156,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
         evidence,
         warnings: this.warningsByProperty.get(propertyName) ?? [],
       };
-    }).filter(item => item.evidence.length > 0 || item.warnings.length > 0);
+    });
   }
 
   async getMaterialVector(materialId: string, estado: EstadoMaterial): Promise<NeuronDataVector | null> {
