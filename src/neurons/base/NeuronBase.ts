@@ -45,11 +45,13 @@ export abstract class NeuronBase {
         componentesUsados = result.componentesConDato;
         anomalias.push(...result.anomalias);
       } else {
-        const valorSheet = input.dataProvider
+        const valorFuente = input.dataProvider
           ? await input.dataProvider.getNormalizedValue(input.materialId, this.propertyName, input.estado)
-          : await getValorNormalizado(input.materialId, this.propertyName, input.estado);
-        if (valorSheet !== null && !isNaN(valorSheet)) {
-          valorCompuesto = Math.min(100, Math.max(0, valorSheet));
+          : this.orientation === 'direct'
+            ? null
+            : await getValorNormalizado(input.materialId, this.propertyName, input.estado);
+        if (valorFuente !== null && !isNaN(valorFuente)) {
+          valorCompuesto = Math.min(100, Math.max(0, valorFuente));
           componentesUsados = 1;
         } else {
           return this.outputVacio(input, `Sin dato en NORMALIZACION para ${input.materialId}/${this.propertyName}`);
@@ -111,7 +113,9 @@ export abstract class NeuronBase {
     for (const comp of componentes) {
       const valor = input.dataProvider
         ? await input.dataProvider.getNormalizedValue(comp.materialId, this.propertyName, input.estado)
-        : await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
+        : this.orientation === 'direct'
+          ? null
+          : await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
       if (valor === null || isNaN(valor)) {
         anomalias.push(`sin_dato_en_sheet:${comp.materialId}/${this.propertyName}`);
         continue;
@@ -265,7 +269,9 @@ export abstract class NeuronBase {
     // propiedad_a/propriedad_b son las únicas variables disponibles.
     const vectors = input.dataProvider
       ? await input.dataProvider.getMaterialVector(input.materialId, input.estado)
-      : await readVectorsFromSheet();
+      : this.orientation === 'direct'
+        ? null
+        : await readVectorsFromSheet();
     const materialVector = Array.isArray(vectors)
       ? vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
         ?? vectors.find(v => v.materialId === input.materialId)
@@ -310,8 +316,13 @@ export abstract class NeuronBase {
           if (_neuronasEnProceso.has(nombre) || !NEURON_MAP[nombre]) continue;
           _neuronasEnProceso.add(nombre);
           try {
-            const otraInput: NeuronInput = { ...input, valorDirecto: undefined };
-            const otraOutput = await NEURON_MAP[nombre].process(otraInput);
+            const neuronaDependiente = NEURON_MAP[nombre];
+            const otraInput: NeuronInput = {
+              ...input,
+              valorDirecto: undefined,
+              dataProvider: neuronaDependiente.orientation === 'direct' ? input.dataProvider : undefined,
+            };
+            const otraOutput = await neuronaDependiente.process(otraInput);
             if (!otraOutput.propiedadPendiente && Number.isFinite(Number(otraOutput.valorCompuesto))) {
               scope[nombre] = Number(otraOutput.valorCompuesto);
             }
