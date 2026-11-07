@@ -143,7 +143,8 @@ const definition: AINeuronProfile = {
       "temperatura_servicio",
       "expansion_termica",
       "calor_especifico"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
