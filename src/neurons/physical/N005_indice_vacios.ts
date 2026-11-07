@@ -1,14 +1,3 @@
-import { NeuronBase } from '../base/NeuronBase';
-
-export class N005_IndiceVacios extends NeuronBase {
-  readonly neuronId = 'N-005';
-  readonly propertyName = 'indice_vacios';
-  readonly orientation = 'direct';
-  readonly group = 'porosity';
-  readonly descripcion = 'Relación entre volumen de vacíos y volumen de sólidos';
-  readonly unidadReferencia = 'adimensional';
-  readonly relatedProperties = ['porosidad_total', 'densidad_aparente', 'densidad_real'];
-  readonly rangoFisicoMin = 0;
-  readonly rangoFisicoMax = 10;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Neurona directa canónica ARKON N005: runtime IA con Llama/Turso. */
+import { AgentNeuronN005 } from "../ai/neurons/N005_indice_vacios";
+export class N005_IndiceVacios extends AgentNeuronN005 {}
