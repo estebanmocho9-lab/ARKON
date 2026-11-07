@@ -1,14 +1,152 @@
-import { NeuronBase } from '../base/NeuronBase';
+/** Neurona directa ARKON N027: perfil IA completo integrado en el módulo físico canónico. */
+import { AgenticNeuron } from "../ai/agenticNeuron";
+import type { AINeuronProfile } from "../ai/types";
 
-export class N027_PermeabilidadIntrinseca extends NeuronBase {
-  readonly neuronId = 'N-027';
-  readonly propertyName = 'permeabilidad_intrinseca';
-  readonly orientation = 'direct';
-  readonly group = 'permeability';
-  readonly descripcion = 'Permeabilidad intrínseca (ley de Darcy)';
-  readonly unidadReferencia = 'mD';
-  readonly relatedProperties = ['porosidad_total', 'diametro_poro', 'conductividad_hidraulica'];
-  readonly rangoFisicoMin = 1e-6;
-  readonly rangoFisicoMax = 1e6;
-  readonly confianzaPorDefecto = 0.95;
+const definition: AINeuronProfile = {
+  "id": "AI-N-027",
+  "coreNeuronId": "N-027",
+  "corePropertyName": "permeabilidad_intrinseca",
+  "name": "Neurona IA N-027 · permeabilidad_intrinseca",
+  "attribute": "permeabilidad_intrinseca",
+  "appliesTo": [
+    "mdf",
+    "gypsum",
+    "concrete"
+  ],
+  "nucleus": "Magnitud central: permeabilidad_intrinseca. ARKON la define como: Permeabilidad intrínseca (ley de Darcy). Unidad de referencia: mD. Busca y evalúa evidencia documental de esa magnitud, no propiedades sustitutas.",
+  "methodGuidance": "Investiga específicamente permeabilidad_intrinseca, propiedad del grupo permeability, definida en el registro ARKON como “Permeabilidad intrínseca (ley de Darcy)”. Conserva la unidad de referencia mD y ten el rango físico de referencia 0.000001 a 1000000 solo como metadato ARKON, no como límite de aceptación del producto. Busca en Turso valores del material/producto y estado solicitados; extrae método/norma, acondicionamiento, geometría u orientación cuando sean pertinentes. Usa las propiedades relacionadas (porosidad_total, diametro_poro, conductividad_hidraulica) y subcables únicamente para localizar fórmulas o dependencias de Supabase; nunca sustituyas la propiedad núcleo por una correlación. Si falta una unidad, método, estado o variable necesaria, informa el faltante y solicita revisión.",
+  "cables": [
+    {
+      "propertyName": "permeabilidad_intrinseca",
+      "neuronId": "N-027",
+      "orientation": "direct",
+      "measures": "Permeabilidad intrínseca (ley de Darcy)",
+      "searchTerms": [
+        "permeabilidad intrinseca",
+        "Permeabilidad intrínseca (ley de Darcy)",
+        "permeability",
+        "porosidad total",
+        "diametro poro",
+        "conductividad hidraulica"
+      ],
+      "units": [
+        "mD"
+      ]
+    },
+    {
+      "propertyName": "resistencia_matriz",
+      "neuronId": "N-77-INV",
+      "orientation": "inverse",
+      "measures": "Resistencia de matriz — frena el flujo de fluidos",
+      "searchTerms": [
+        "resistencia matriz",
+        "Resistencia de matriz — frena el flujo de fluidos",
+        "transport",
+        "resistividad hidraulica",
+        "rectitud flujo"
+      ],
+      "units": [
+        "m/s"
+      ]
+    },
+    {
+      "propertyName": "porosidad_total",
+      "neuronId": "N-003",
+      "orientation": "direct",
+      "measures": "Fracción de volumen de vacíos respecto al volumen total",
+      "searchTerms": [
+        "porosidad total",
+        "Fracción de volumen de vacíos respecto al volumen total",
+        "porosity",
+        "densidad aparente",
+        "absorcion agua",
+        "resistencia compresion"
+      ],
+      "units": [
+        "%"
+      ]
+    },
+    {
+      "propertyName": "diametro_poro",
+      "neuronId": "N-009",
+      "orientation": "direct",
+      "measures": "Diámetro medio de poro",
+      "searchTerms": [
+        "diametro poro",
+        "Diámetro medio de poro",
+        "pore",
+        "volumen poro",
+        "permeabilidad intrinseca",
+        "tortuosidad"
+      ],
+      "units": [
+        "nm"
+      ]
+    },
+    {
+      "propertyName": "conductividad_hidraulica",
+      "neuronId": "N-028",
+      "orientation": "direct",
+      "measures": "Conductividad hidráulica saturada",
+      "searchTerms": [
+        "conductividad hidraulica",
+        "Conductividad hidráulica saturada",
+        "permeability",
+        "permeabilidad intrinseca",
+        "porosidad total",
+        "absorcion agua"
+      ],
+      "units": [
+        "m/s"
+      ]
+    }
+  ],
+  "subCables": [
+    {
+      "id": "SUPABASE-permeabilidad_intrinseca",
+      "purpose": "Consultar reglas y fórmulas activas de Supabase relacionadas con permeabilidad_intrinseca; comprobar entradas, unidades y dominio antes de razonar.",
+      "requiredProperties": [
+        "permeabilidad_intrinseca",
+        "porosidad_total",
+        "diametro_poro",
+        "conductividad_hidraulica"
+      ]
+    }
+  ],
+  "evidenceTerms": [
+    "permeabilidad intrinseca",
+    "Permeabilidad intrínseca (ley de Darcy)",
+    "permeability",
+    "porosidad total",
+    "diametro poro",
+    "conductividad hidraulica",
+    "resistencia matriz",
+    "Resistencia de matriz — frena el flujo de fluidos",
+    "transport",
+    "resistividad hidraulica",
+    "rectitud flujo",
+    "Fracción de volumen de vacíos respecto al volumen total",
+    "porosity",
+    "densidad aparente",
+    "absorcion agua",
+    "resistencia compresion"
+  ],
+  "sourceNeuron": {
+    "group": "permeability",
+    "definition": "Permeabilidad intrínseca (ley de Darcy)",
+    "referenceUnit": "mD",
+    "physicalRange": {
+      "min": 0.000001,
+      "max": 1000000
+    },
+    "relatedProperties": [
+      "porosidad_total",
+      "diametro_poro",
+      "conductividad_hidraulica"
+    ]
+  }
+};
+
+export class N027_PermeabilidadIntrinseca extends AgenticNeuron {
+  constructor() { super(definition); }
 }

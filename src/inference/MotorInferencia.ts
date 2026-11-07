@@ -54,7 +54,13 @@ export class MotorInferencia {
       Array.from(propiedadesUnicas).map(async (propName) => {
         const neurona = NEURON_MAP[propName];
         if (!neurona) throw new Error(`Neurona no encontrada para propiedad '${propName}'`);
-        const output = await neurona.process(input);
+        const neuronInput: NeuronInput = neurona.orientation === 'direct'
+          ? input
+          : { ...input, dataProvider: undefined };
+        const output = await neurona.process(neuronInput);
+        if (output.propiedadPendiente) {
+          throw new Error(`Falta evidencia normalizada verificable para ${propName}; no se usará el valor de reserva 50 en un cruce científico.`);
+        }
         return { propName, output };
       })
     );

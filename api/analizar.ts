@@ -27,13 +27,56 @@ function resolverMaterialId(id: string): string {
   return match ? `M.${match[1]}` : value;
 }
 
+/**
+ * Puente servidor-a-servidor hacia el cerebro madre de ARKON.
+ * La ruta principal conserva el motor científico existente; esta llamada
+ * agrega la evaluación de las 50 neuronas IA cuando el despliegue está listo.
+ */
+async function consultarCerebroIA(materialId: string, estado: string, neuronIds?: string[]) {
+  const baseUrl = process.env.ARKON_BRIDGE_URL?.trim().replace(/\/+$/, '');
+  const token = process.env.ARKON_BRIDGE_TOKEN?.trim();
+  if (!baseUrl || !token) {
+    return { materialId, status: 'bridge_not_configured', message: 'Faltan ARKON_BRIDGE_URL o ARKON_BRIDGE_TOKEN en el servidor Vercel.' };
+  }
+  if (!['E01', 'E02', 'E03'].includes(estado)) {
+    return { materialId, status: 'state_required', message: 'Indica explícitamente E01, E02 o E03; el cerebro no asigna estados por defecto.' };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55_000);
+  try {
+    const response = await fetch(`${baseUrl}/api/analizar-llama-turso`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ARKON-TOKEN': token,
+      },
+      body: JSON.stringify({ material_id: materialId, estado, ...(neuronIds?.length ? { neuronIds } : {}) }),
+      signal: controller.signal,
+    });
+    const payload: any = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { materialId, status: 'brain_request_failed', httpStatus: response.status, message: payload?.error ?? 'El cerebro madre rechazó la solicitud.' };
+    }
+    return { materialId, status: 'completed', result: payload?.resultado ?? payload };
+  } catch (error: any) {
+    return {
+      materialId,
+      status: 'brain_unreachable',
+      message: error?.name === 'AbortError' ? 'El cerebro madre superó el límite de 55 segundos.' : 'No se pudo establecer comunicación con el cerebro madre.',
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function parseComposicion(value: unknown): Record<string, number> {
   if (!value) return {};
   if (typeof value === 'object' && !Array.isArray(value)) {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .map(([k, v]) => [k, Number(v)])
-        .filter(([, v]) => Number.isFinite(v) && v > 0)
+        .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) > 0)
     );
   }
   if (typeof value === 'string') {
@@ -104,7 +147,7 @@ function descripcionPropiedad(prop: string, valor: number): string {
     reciclabilidad: 'reciclabilidad',
     impermeabilidad: 'impermeabilidad',
   };
-  const nombre = nombres[prop] ?? prop.replaceAll('_', ' ');
+  const nombre = nombres[prop] ?? prop.replace(/_/g, ' ');
   if (MAYOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel elevado según el umbral operativo del motor.`;
   if (MENOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel insuficiente según el umbral operativo del motor.`;
   return `${nombre}: índice ${valor.toFixed(1)}/100 — requiere revisión.`;
@@ -414,6 +457,20 @@ export default async function handler(req: any, res: any) {
       }).eq('id', trabajoId);
     }
 
+    // La integración IA es aditiva: no sustituye ni modifica los resultados
+    // científicos calculados arriba. Si no hay estado explícito, queda pendiente.
+    const aiNeuronsEnabled = body.includeAiNeurons !== false;
+    const estadoIA = String(body.estado ?? '').trim().toUpperCase();
+    const neuronasIA = aiNeuronsEnabled
+      ? await Promise.all(componentes.map(componente =>
+          consultarCerebroIA(
+            componente.materialId,
+            estadoIA,
+            Array.isArray(body.neuronIds) ? body.neuronIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 50) : undefined,
+          )
+        ))
+      : null;
+
     res.status(200).json({
       ok: true,
       resultado_id: resultadoGuardado.id,
@@ -438,6 +495,7 @@ export default async function handler(req: any, res: any) {
       triz,
       pendientes,
       reglas_mejora_encontradas: fuentesMejora.length,
+      ...(neuronasIA ? { neuronasIA } : {}),
     });
   } catch (err: any) {
     console.error('❌ /api/analizar:', err);

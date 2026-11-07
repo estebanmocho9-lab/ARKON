@@ -45,12 +45,21 @@ export abstract class NeuronBase {
         componentesUsados = result.componentesConDato;
         anomalias.push(...result.anomalias);
       } else {
-        const valorSheet = await getValorNormalizado(input.materialId, this.propertyName, input.estado);
-        if (valorSheet !== null && !isNaN(valorSheet)) {
-          valorCompuesto = Math.min(100, Math.max(0, valorSheet));
+        const valorFuente = input.dataProvider
+          ? await input.dataProvider.getNormalizedValue(input.materialId, this.propertyName, input.estado)
+          : this.orientation === 'direct' && input.allowSheetsFallback !== true
+            ? null
+            : await getValorNormalizado(input.materialId, this.propertyName, input.estado);
+        if (valorFuente !== null && !isNaN(valorFuente)) {
+          valorCompuesto = Math.min(100, Math.max(0, valorFuente));
           componentesUsados = 1;
         } else {
-          return this.outputVacio(input, `Sin dato en NORMALIZACION para ${input.materialId}/${this.propertyName}`);
+          const razon = input.dataProvider
+            ? `Sin dato normalizado ARKON 0–100 verificable en Turso para ${input.materialId}/${this.propertyName}; la evidencia documental se conserva para revisión.`
+            : this.orientation === 'direct'
+              ? `Neurona directa sin proveedor cerebral para ${input.materialId}/${this.propertyName}; no se consulta Google Sheets.`
+              : `Sin dato en NORMALIZACION para ${input.materialId}/${this.propertyName}`;
+          return this.outputVacio(input, razon);
         }
       }
 
@@ -70,7 +79,9 @@ export abstract class NeuronBase {
       const anomaliasConsistencia = this.verificarConsistencia(valorCompuesto, inverso, metodoUsado);
       anomalias.push(...anomaliasConsistencia);
 
-      this.guardarMemoria(input, valorCompuesto, inverso, anomalias, componentesUsados, indicesIntermedios).catch(e => console.warn(e));
+      if (input.persistMemory !== false) {
+        this.guardarMemoria(input, valorCompuesto, inverso, anomalias, componentesUsados, indicesIntermedios).catch(e => console.warn(e));
+      }
 
       return {
         neuronId: this.neuronId,
@@ -105,7 +116,11 @@ export abstract class NeuronBase {
     const anomalias: string[] = [];
 
     for (const comp of componentes) {
-      const valor = await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
+      const valor = input.dataProvider
+        ? await input.dataProvider.getNormalizedValue(comp.materialId, this.propertyName, input.estado)
+        : this.orientation === 'direct' && input.allowSheetsFallback !== true
+          ? null
+          : await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
       if (valor === null || isNaN(valor)) {
         anomalias.push(`sin_dato_en_sheet:${comp.materialId}/${this.propertyName}`);
         continue;
@@ -132,11 +147,8 @@ export abstract class NeuronBase {
   }
 
   private async obtenerReglaMezcla(materialTipo?: string): Promise<{ formula: string }> {
-    if (materialTipo) {
-      const { data: dataEsp } = await supabase.from('reglas_mezcla').select('formula')
-        .eq('propiedad_nombre', this.propertyName).eq('activo', true).eq('tipo_material_aplica', materialTipo).limit(1).maybeSingle();
-      if (dataEsp) return { formula: dataEsp.formula };
-    }
+    // El esquema vigente de reglas_mezcla no contiene tipo_material_aplica.
+    // Se consulta únicamente por propiedad y estado activo; no se envía un filtro inexistente.
     const { data, error } = await supabase.from('reglas_mezcla').select('formula')
       .eq('propiedad_nombre', this.propertyName).eq('activo', true).limit(1).single();
     if (error || !data) return { formula: 'ponderada_lineal' };
@@ -257,9 +269,15 @@ export abstract class NeuronBase {
     // Cargar una sola vez el vector REAL del material. Las fórmulas científicas
     // pueden necesitar varias propiedades a la vez; no debemos asumir que
     // propiedad_a/propriedad_b son las únicas variables disponibles.
-    const vectors = await readVectorsFromSheet();
-    const materialVector = vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
-      ?? vectors.find(v => v.materialId === input.materialId);
+    const vectors = input.dataProvider
+      ? await input.dataProvider.getMaterialVector(input.materialId, input.estado)
+      : this.orientation === 'direct' && input.allowSheetsFallback !== true
+        ? null
+        : await readVectorsFromSheet();
+    const materialVector = Array.isArray(vectors)
+      ? vectors.find(v => v.materialId === input.materialId && v.estado === input.estado)
+        ?? vectors.find(v => v.materialId === input.materialId)
+      : vectors;
     const scopeBase: Record<string, number> = {};
 
     // El contexto puede aportar variables experimentales (temperatura, carga,
@@ -297,11 +315,23 @@ export abstract class NeuronBase {
         // normalizado real como fallback. Esto evita recursiones y evita volver
         // a pasar el valorDirecto de la neurona actual a otra propiedad.
         for (const nombre of faltantes) {
-          if (_neuronasEnProceso.has(nombre) || !NEURON_MAP[nombre]) continue;
+          if (!NEURON_MAP[nombre]) continue;
+          // Una neurona directa no puede recurrir a una inversa que lea Sheets.
+          // La ruta inversa sí conserva su acceso legado a dependencias directas.
+          if (this.orientation === 'direct' && NEURON_MAP[nombre].orientation === 'inverse') continue;
+          if (_neuronasEnProceso.has(nombre)) continue;
           _neuronasEnProceso.add(nombre);
           try {
-            const otraInput: NeuronInput = { ...input, valorDirecto: undefined };
-            const otraOutput = await NEURON_MAP[nombre].process(otraInput);
+            const neuronaDependiente = NEURON_MAP[nombre];
+            const otraInput: NeuronInput = {
+              ...input,
+              valorDirecto: undefined,
+              dataProvider: neuronaDependiente.orientation === 'direct' ? input.dataProvider : undefined,
+              allowSheetsFallback: this.orientation === 'inverse' && neuronaDependiente.orientation === 'direct'
+                ? true
+                : input.allowSheetsFallback,
+            };
+            const otraOutput = await neuronaDependiente.process(otraInput);
             if (!otraOutput.propiedadPendiente && Number.isFinite(Number(otraOutput.valorCompuesto))) {
               scope[nombre] = Number(otraOutput.valorCompuesto);
             }

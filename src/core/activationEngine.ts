@@ -1,12 +1,13 @@
 // ============================================================
-// src/core/activationEngine.ts
-// LÓGICA CLAVE: neuronas sin datos se ignoran, no bloquean el cálculo.
-// Los vectores se leen DIRECTAMENTE desde NORMALIZACION de Google Sheets.
+// Directas: estructuras IA + cerebro Llama/Turso.
+// Inversas: conservan íntegra su fuente original de vectores.
 // ============================================================
-
-import { ALL_NEURONS, NEURON_MAP, NeuronOutput, NeuronInput } from '../neurons/index';
+import { ALL_NEURONS, NeuronOutput, NeuronInput } from '../neurons/index';
+import { DIRECT_AI_NEURONS } from '../neurons/ai/neurons';
+import { LlamaTursoDataProvider } from '../neurons/ai/llamaTursoDataProvider';
 import { EstadoMaterial } from '../neurons/base/tipos';
 import { getRealVector } from '../sheets/realVectors';
+import { supabase } from '../supabase/client';
 
 const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
   absorcion: ['absorption','porosity','permeability','diffusion','surface','chemical','pore'],
@@ -22,14 +23,11 @@ const CONTEXTOS_ACTIVACION: Record<string, string[]> = {
   peso: ['density','porosity','mechanical'],
   general: [],
 };
-
 const UMBRAL_CONFIANZA_MINIMO = 0.15;
 const ESTADOS_LOGICOS = new Set<EstadoMaterial>(['E01', 'E02', 'E03']);
 
 function normalizarEstadoNeural(estado?: string): EstadoMaterial {
-  return estado && ESTADOS_LOGICOS.has(estado as EstadoMaterial)
-    ? estado as EstadoMaterial
-    : 'E01';
+  return estado && ESTADOS_LOGICOS.has(estado as EstadoMaterial) ? estado as EstadoMaterial : 'E01';
 }
 
 export interface ActivationResult {
@@ -37,74 +35,103 @@ export interface ActivationResult {
   neuronasConDatos: number; neuronasSinDatos: number; totalNeuronas: number;
   coberturaPorc: number; confianzaPromedio: number; propiedadesConDatos: number;
   propiedadesPendientes: string[]; esResultadoParcial: boolean; timestamp: string;
+  evidenciaTurso: ReturnType<LlamaTursoDataProvider['getEvidenceAudit']>;
 }
 
-export async function activarNeuronas(materialId: string, contexto = 'general', estado?: string): Promise<ActivationResult> {
+export async function activarNeuronas(
+  materialId: string, contexto = 'general', estado?: string, providerOverride?: LlamaTursoDataProvider,
+): Promise<ActivationResult> {
   console.log(`\n🧠 Activando neuronas — ${materialId} | contexto: ${contexto}${estado ? ` | estado: ${estado}` : ''}`);
-
-  // FUENTE ÚNICA: Google Sheets / NORMALIZACION.
-  const vector = await getRealVector(materialId, estado);
-  if (!vector) {
-    return {
-      materialId, estado, neuronasActivadas: [], neuronasConDatos: 0, neuronasSinDatos: 0,
-      totalNeuronas: 0, coberturaPorc: 0, confianzaPromedio: 0, propiedadesConDatos: 0,
-      propiedadesPendientes: [], esResultadoParcial: false, timestamp: new Date().toISOString()
-    };
+  const gruposActivos = CONTEXTOS_ACTIVACION[contexto] ?? [];
+  const neuronasDirectas = DIRECT_AI_NEURONS.filter(n =>
+    gruposActivos.length === 0 || gruposActivos.includes(n.profile.sourceNeuron?.group ?? '')
+  );
+  const neuronasInversas = ALL_NEURONS.filter(n =>
+    n.orientation === 'inverse' && (gruposActivos.length === 0 || gruposActivos.includes(n.group))
+  );
+  const estadoNormalizado = normalizarEstadoNeural(estado);
+  let provider = providerOverride;
+  if (!provider) {
+    const { data: material } = await supabase.from('catalogo_materiales')
+      .select('nombre').eq('id_material', materialId).maybeSingle();
+    provider = new LlamaTursoDataProvider(
+      materialId, String(material?.nombre ?? materialId), estadoNormalizado,
+      estadoNormalizado === 'E01' ? 'comercial inicial' : estadoNormalizado === 'E02' ? 'fraguado seco' : 'degradado',
+    );
   }
 
-  const gruposActivos = CONTEXTOS_ACTIVACION[contexto] ?? [];
-  const neuronasParaActivar = gruposActivos.length === 0 ? ALL_NEURONS : ALL_NEURONS.filter(n => gruposActivos.includes(n.group));
   const resultados: NeuronOutput[] = [];
   const propiedadesPendientes: string[] = [];
   let neuronasConDatos = 0;
   let neuronasSinDatos = 0;
 
-  for (const neurona of neuronasParaActivar) {
+  // Solo las directas reciben el proveedor del cerebro. Nunca leen NORMALIZACION.
+  for (const neuronaIA of neuronasDirectas) {
+    try {
+      const output = await neuronaIA.process({ materialId, estado: estadoNormalizado, dataProvider: provider });
+      if (output.propiedadPendiente) {
+        neuronasSinDatos++;
+        propiedadesPendientes.push(output.propertyName);
+      } else {
+        resultados.push(output);
+        neuronasConDatos++;
+      }
+    } catch (err) {
+      console.error(`⚠️ Neurona directa ${neuronaIA.sourceNeuronId} (${neuronaIA.propertyName}) falló:`, err);
+      neuronasSinDatos++;
+      propiedadesPendientes.push(`${neuronaIA.propertyName} [error]`);
+    }
+  }
+
+  // Las inversas conservan la fuente vectorial y el comportamiento anteriores.
+  const vectorInversas = await getRealVector(materialId, estado);
+  for (const neurona of neuronasInversas) {
     const prop = neurona.propertyName;
-    const valorNormalizado = vector[prop];
+    const valorNormalizado = vectorInversas?.[prop];
     if (valorNormalizado === null || valorNormalizado === undefined) {
       neuronasSinDatos++;
       propiedadesPendientes.push(prop);
       continue;
     }
-
     const contextoNeural: Record<string, number> = {};
     for (const propRel of neurona.relatedProperties) {
-      const val = vector[propRel];
+      const val = vectorInversas?.[propRel];
       if (val !== null && val !== undefined) contextoNeural[propRel] = val as number;
     }
-
     const input: NeuronInput = {
-      materialId,
-      estado: normalizarEstadoNeural(estado),
-      valorDirecto: valorNormalizado as number,
-      contexto: contextoNeural
+      materialId, estado: estadoNormalizado, valorDirecto: valorNormalizado as number, contexto: contextoNeural,
     };
-
     try {
-      resultados.push(await neurona.process(input));
-      neuronasConDatos++;
+      const output = await neurona.process(input);
+      if (output.propiedadPendiente) {
+        neuronasSinDatos++;
+        propiedadesPendientes.push(prop);
+      } else {
+        resultados.push(output);
+        neuronasConDatos++;
+      }
     } catch (err) {
-      console.error(`⚠️ Neurona ${neurona.neuronId} (${prop}) falló:`, err);
+      console.error(`⚠️ Neurona inversa ${neurona.neuronId} (${prop}) falló:`, err);
       neuronasSinDatos++;
       propiedadesPendientes.push(`${prop} [error]`);
     }
   }
 
-  const totalNeuronas = neuronasParaActivar.length;
+  const totalNeuronas = neuronasDirectas.length + neuronasInversas.length;
   const coberturaPorc = totalNeuronas > 0 ? neuronasConDatos / totalNeuronas * 100 : 0;
-  const confianzaPromedio = resultados.length > 0 ? resultados.reduce((sum, n) => sum + (n.confianza ?? 0), 0) / resultados.length : 0;
+  const confianzaPromedio = resultados.length > 0
+    ? resultados.reduce((sum, n) => sum + (n.confianza ?? 0), 0) / resultados.length : 0;
   const esResultadoParcial = neuronasSinDatos > 0 && neuronasConDatos > 0;
   const simbolo = coberturaPorc >= 70 ? '✅' : coberturaPorc >= 30 ? '⚠️' : '🔴';
-
   console.log(`${simbolo} Neuronas activadas: ${neuronasConDatos}/${totalNeuronas} (${coberturaPorc.toFixed(0)}%)`);
-  if (neuronasSinDatos > 0) console.log(`   ⏭️ Ignoradas por falta de datos: ${neuronasSinDatos}`);
+  if (neuronasSinDatos > 0) console.log(`   ⏭️ Pendientes por falta de datos: ${neuronasSinDatos}`);
   if (coberturaPorc < UMBRAL_CONFIANZA_MINIMO * 100) console.log(`   ⚠️ Cobertura muy baja (${coberturaPorc.toFixed(0)}%)`);
 
   return {
     materialId, estado, neuronasActivadas: resultados, neuronasConDatos, neuronasSinDatos,
     totalNeuronas, coberturaPorc, confianzaPromedio, propiedadesConDatos: neuronasConDatos,
-    propiedadesPendientes, esResultadoParcial, timestamp: new Date().toISOString()
+    propiedadesPendientes, esResultadoParcial, timestamp: new Date().toISOString(),
+    evidenciaTurso: provider.getEvidenceAudit(),
   };
 }
 

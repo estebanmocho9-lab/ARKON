@@ -1,4 +1,5 @@
 import express from 'express';
+import { timingSafeEqual } from 'crypto';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { ALL_NEURONS } from './neurons/index';
@@ -6,6 +7,9 @@ import { activarNeuronas } from './core/activationEngine';
 import { getVectorFromSheet, listarMaterialesDesdeSheet } from './sheets/syncData';
 import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
+import { analyzeWithLlamaMotherBrain, runAINeuronCalculations, llamaMotherBrain } from './neurons/ai/motherBrain';
+import { getAINeuronTursoClient } from './neurons/ai/aiTursoClient';
+import { LlamaTursoDataProvider } from './neurons/ai/llamaTursoDataProvider';
 
 dotenv.config();
 
@@ -20,13 +24,14 @@ interface Producto {
   nombre: string;
   material_id: string;
   contexto?: string | null;
+  composicion?: unknown;
   activo?: boolean;
 }
 
 async function obtenerProductosActivos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from('productos')
-    .select('id, nombre, material_id, contexto, activo')
+    .select('id, nombre, material_id, contexto, composicion, activo')
     .eq('activo', true)
     .order('id', { ascending: true });
   if (error) throw new Error(`No se pudieron leer productos de Supabase: ${error.message}`);
@@ -107,6 +112,142 @@ app.get('/api/products/:id', async (req, res) => {
  * ejecuta todos los problemas científicos configurados, y devuelve las
  * fuentes registradas de mejoras, fórmulas, cruces y TRIZ.
  */
+app.post('/api/analizar-llama-turso', async (req, res) => {
+  try {
+    const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+    const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+    const expectedBytes = Buffer.from(expectedToken ?? '');
+    const providedBytes = Buffer.from(providedToken);
+    const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+    if (!tokenMatches) return res.status(401).json({ ok: false, error: 'Modalidad IA no autorizada: configura ARKON_BRIDGE_TOKEN.' });
+
+    const rawId = req.body?.productId ?? req.body?.material_id ?? req.body?.materialId;
+    const requestedId = rawId === undefined || rawId === null ? '' : String(rawId).trim();
+    if (!requestedId) return res.status(400).json({ ok: false, error: 'productId, material_id o materialId es obligatorio.' });
+    let product: any = await resolverProducto(requestedId);
+    // Los componentes de una composición pueden existir en el catálogo de
+    // materiales sin tener una ficha de producto activa. El cerebro IA también
+    // debe poder analizar esos materiales por su ID científico.
+    if (!product && /^M\.\d+$/i.test(requestedId)) {
+      const { data: catalogMaterial } = await supabase.from('catalogo_materiales')
+        .select('id_material, nombre').eq('id_material', requestedId).maybeSingle();
+      if (catalogMaterial) {
+        product = {
+          id: catalogMaterial.id_material,
+          material_id: catalogMaterial.id_material,
+          nombre: catalogMaterial.nombre,
+        };
+      }
+    }
+    if (!product) return res.status(404).json({ ok: false, error: 'Producto/material no encontrado en Supabase.' });
+
+    const materialId = String(product.material_id ?? '').trim();
+    if (!/^M\.\d+$/i.test(materialId)) return res.status(422).json({ ok: false, error: 'material_id inválido.' });
+    const requestedState = typeof req.body?.estado === 'string' ? req.body.estado.trim().toUpperCase() : '';
+    if (!['E01', 'E02', 'E03'].includes(requestedState)) {
+      return res.status(422).json({ ok: false, error: 'Debe indicar un estado material válido: E01, E02 o E03. ARKON no asigna un estado por defecto.' });
+    }
+    const neuronIds = Array.isArray(req.body?.neuronIds)
+      ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string')
+      : (typeof req.body?.propertyName === 'string' ? [req.body.propertyName] : undefined);
+    const stateCode = typeof req.body?.estado === 'string' ? req.body.estado : null;
+    const stateName = typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null;
+
+    // El cerebro madre ejecuta primero la recuperación y evaluación de evidencia:
+    // cada neurona seleccionada consulta Turso y Llama valida únicamente los
+    // fragmentos trazables. Después se ejecuta el motor científico original,
+    // sin convertir unidades físicas ni sustituir sus fórmulas.
+    const evidenceAnalysis = await analyzeWithLlamaMotherBrain({
+      productName: product.nombre,
+      materialName: product.nombre,
+      materialId,
+      stateCode,
+      stateName,
+      neuronIds,
+    });
+    const scientificCalculations = await runAINeuronCalculations({
+      productName: product.nombre,
+      materialId,
+      stateCode,
+      stateName,
+      neuronIds,
+    });
+    return res.json({
+      ok: true,
+      modalidad: 'mother-brain-llama-turso-science',
+      producto: { id: product.id, nombre: product.nombre, materialId },
+      evidenciaIA: evidenceAnalysis,
+      resultadoCientifico: scientificCalculations,
+    });
+  } catch (error) {
+    console.error('POST /api/analizar-llama-turso:', error);
+    return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post('/api/ai/llama/test', async (req, res) => {
+  const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+  const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+  const expectedBytes = Buffer.from(expectedToken ?? '');
+  const providedBytes = Buffer.from(providedToken);
+  const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+  if (!tokenMatches) {
+    return res.status(expectedToken ? 401 : 503).json({
+      ok: false,
+      error: expectedToken ? 'Prueba de conexión no autorizada.' : 'Falta configurar ARKON_BRIDGE_TOKEN en el backend.',
+    });
+  }
+
+  try {
+    // Esta ruta prueba exclusivamente la comunicación cerebro madre ↔ Llama.
+    // No consulta Turso, Supabase ni activa neuronas.
+    const result = await llamaMotherBrain.testLlamaConnection();
+    return res.json({ ok: true, stage: 'mother-brain-to-llama', ...result });
+  } catch (error) {
+    console.error('POST /api/ai/llama/test:', error);
+    return res.status(502).json({
+      ok: false,
+      stage: 'mother-brain-to-llama',
+      error: error instanceof Error ? error.message : 'No se pudo establecer comunicación con Llama.',
+    });
+  }
+});
+
+app.get('/api/ai-neurons/health', async (req, res) => {
+  try {
+    const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+    const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+    const expectedBytes = Buffer.from(expectedToken ?? '');
+    const providedBytes = Buffer.from(providedToken);
+    const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+    if (!tokenMatches) return res.status(401).json({ ok: false, error: 'Diagnóstico IA no autorizado.' });
+
+    const turso = getAINeuronTursoClient();
+    let tursoStatus: 'not_configured' | 'unreachable' | 'schema_missing' | 'connected' = turso ? 'unreachable' : 'not_configured';
+    let evidenceRows: number | null = null;
+    if (turso) {
+      try {
+        const result = await turso.execute('SELECT COUNT(*) AS total FROM nd_hallazgos_raw');
+        evidenceRows = Number(result.rows[0]?.total ?? 0);
+        tursoStatus = 'connected';
+      } catch {
+        tursoStatus = 'schema_missing';
+      }
+    }
+
+    const llamaConfigured = Boolean(process.env.CLOUDFLARE_ACCOUNT_ID?.trim() && process.env.CLOUDFLARE_API_TOKEN?.trim());
+    return res.json({
+      ok: true,
+      turso: { status: tursoStatus, evidenceRows },
+      llama: { configured: llamaConfigured, model: process.env.CLOUDFLARE_MODEL?.trim() || '@cf/meta/llama-3.2-3b-instruct' },
+      requiredSyncCommand: 'npm run sync:ai-turso',
+    });
+  } catch (error) {
+    console.error('GET /api/ai-neurons/health:', error);
+    return res.status(500).json({ ok: false, error: 'No se pudo consultar el estado de la capa IA.' });
+  }
+});
+
 app.post('/api/analizar', async (req, res) => {
   try {
     // Aceptar tanto IDs JSON numéricos como strings y también material_id/materialId.
@@ -123,13 +264,19 @@ app.post('/api/analizar', async (req, res) => {
       return res.status(422).json({ ok: false, error: `material_id inválido: "${materialId}". NORMALIZACION usa IDs M.xxx.`, producto: { id: product.id, nombre: product.nombre, materialId } });
     }
 
-    const vector = await getVectorFromSheet(materialId);
-    if (!vector) return res.status(422).json({ ok: false, error: `No existe vector real en NORMALIZACION para ${materialId}.`, producto: { id: product.id, nombre: product.nombre, materialId } });
-
     const contexto = typeof req.body?.contexto === 'string' && req.body.contexto.trim() ? req.body.contexto.trim().toLowerCase() : 'general';
     const estado = typeof req.body?.estado === 'string' ? req.body.estado : undefined;
 
-    const activacion = await activarNeuronas(materialId, 'general', estado);
+    // El análisis estándar siempre continúa por el motor científico integrado.
+    // Las evaluaciones IA se incorporan más abajo al mismo resultado; no hay
+    // una ruta alternativa que omita la activación física ni las 50 inversas.
+
+    // Un mismo proveedor cerebral atiende las 50 directas durante toda esta petición.
+    // Las 50 inversas siguen usando su vector original dentro de activationEngine.
+    const estadoProveedor = estado === 'E02' || estado === 'E03' ? estado : 'E01';
+    const nombreEstado = typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null;
+    const proveedorDirectas = new LlamaTursoDataProvider(materialId, product.nombre, estadoProveedor, nombreEstado);
+    const activacion = await activarNeuronas(materialId, 'general', estado, proveedorDirectas);
 
     const problemasDetectados = activacion.neuronasActivadas
       .map(n => ({
@@ -160,6 +307,7 @@ app.post('/api/analizar', async (req, res) => {
           materialId,
           estado: estado === 'E02' || estado === 'E03' ? estado : 'E01',
           componentes: [],
+          dataProvider: proveedorDirectas,
         });
         analisisProblemas.push({ nombreProblema: nombre, ok: true, resultado });
       } catch (error) {
@@ -218,28 +366,74 @@ app.post('/api/analizar', async (req, res) => {
       return propsProblema.some(p => props.includes(p.toLowerCase()));
     }).slice(0, 50);
 
+    // Las 50 neuronas-agente son parte del análisis normal: se ejecutan junto
+    // con el motor científico, usando evidencia de Turso y contexto de Supabase.
+    // No reemplazan fórmulas ni cálculos físicos; los complementan y auditan.
+    let aiNeurons: any = null;
+    {
+      const expectedToken = process.env.ARKON_BRIDGE_TOKEN?.trim();
+      const providedToken = String(req.header('x-arkon-token') ?? '').trim();
+      const expectedBytes = Buffer.from(expectedToken ?? '');
+      const providedBytes = Buffer.from(providedToken);
+      const tokenMatches = Boolean(expectedToken && providedToken && expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes));
+      const authorized = process.env.NODE_ENV !== 'production'
+        ? (!expectedToken || tokenMatches)
+        : tokenMatches;
+
+      if (!authorized) {
+        aiNeurons = {
+          enabled: true, status: 'unauthorized', provider: 'Cloudflare Workers AI',
+          readOnly: true, writesToSupabase: false,
+          message: 'La rama de neuronas IA requiere el token servidor-a-servidor configurado en ARKON y Vercel.',
+        };
+      } else {
+        const currentProperties: Record<string, unknown> = {};
+        for (const n of activacion.neuronasActivadas) {
+          currentProperties[n.propertyName] = { value: n.valorCompuesto, confidence: n.confianza, neuronId: n.neuronId };
+        }
+        aiNeurons = await analyzeWithLlamaMotherBrain({
+          productName: product.nombre,
+          productId: product.id,
+          materialId,
+          composition: product.composicion ?? null,
+          stateCode: estado ?? null,
+          stateName: typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : (typeof req.body?.stateName === 'string' ? req.body.stateName : null),
+          neuronIds: Array.isArray(req.body?.neuronIds) ? req.body.neuronIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 12) : undefined,
+          currentProperties,
+          scientificContext: {
+            rules: [...(reglas ?? []), ...(mejoras ?? [])],
+            formulas: formulas ?? [],
+            scientificCrosses: cruces ?? [],
+            triz: triz ?? [],
+          },
+        });
+      }
+    }
+
     const anomalias = activacion.neuronasActivadas.flatMap((n: any) => (n.anomalias ?? []).map((a: any) => ({ neuronId: n.neuronId, propertyName: n.propertyName, detalle: String(a) })));
     const errores = [
       ...anomalias.map((a: any) => `${a.propertyName}: ${a.detalle}`),
-      ...activacion.propiedadesPendientes.map(prop => `Sin dato real en NORMALIZACION: ${prop}`),
+      ...activacion.propiedadesPendientes.map(prop => `Sin dato verificable en la fuente asignada a la neurona: ${prop}`),
       ...analisisProblemas.filter(p => !p.ok).map(p => `${p.nombreProblema}: ${p.error}`),
     ];
 
     return res.json({
       ok: true,
       motor: 'ARKON REAL',
-      fuente: 'Supabase + Google Sheets NORMALIZACION',
+      fuente: 'Turso documental para neuronas directas + fuente original de vectores para inversas + Supabase científico',
       producto: { id: product.id, nombre: product.nombre, materialId, contexto: product.contexto ?? contexto },
       diagnosticoIntegral: {
         cobertura: { neuronasConDatos: activacion.neuronasConDatos, totalNeuronas: activacion.totalNeuronas, coberturaPorc: activacion.coberturaPorc, confianzaPromedio: activacion.confianzaPromedio },
         problemasDetectados,
         anomalias,
         propiedadesPendientes: activacion.propiedadesPendientes,
+        evidenciaTurso: activacion.evidenciaTurso,
         soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales },
         formulas: formulasRelacionadas,
         cruces: crucesDisponibles,
         triz: trizRelacionadas,
         analisisProblemas,
+        ...(aiNeurons ? { neuronasIA: aiNeurons } : {}),
         resumen: {
           neuronasConDatos: activacion.neuronasConDatos,
           totalNeuronas: activacion.totalNeuronas,
@@ -252,7 +446,8 @@ app.post('/api/analizar', async (req, res) => {
         },
       },
       materiales: [{ materialId, resultado: { ...activacion, errores, mejoras: mejorasReales, reglasMejora: solucionesReglas, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas } }],
-      resultado: { activacion, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas },
+      resultado: { activacion, evidenciaTurso: activacion.evidenciaTurso, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas, ...(aiNeurons ? { neuronasIA: aiNeurons } : {}) },
+      ...(aiNeurons ? { aiNeurons } : {}),
     });
   } catch (error) {
     console.error('POST /api/analizar:', error);
