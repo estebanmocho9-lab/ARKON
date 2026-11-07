@@ -141,7 +141,8 @@ const definition: AINeuronProfile = {
       "cao",
       "sio2",
       "expansion_termica"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
