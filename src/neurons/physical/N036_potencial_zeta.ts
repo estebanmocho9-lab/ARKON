@@ -1,14 +1,3 @@
-import { NeuronBase } from '../base/NeuronBase';
-
-export class N036_PotencialZeta extends NeuronBase {
-  readonly neuronId = 'N-036';
-  readonly propertyName = 'potencial_zeta';
-  readonly orientation = 'direct';
-  readonly group = 'surface';
-  readonly descripcion = 'Potencial eléctrico en la interfaz sólido-líquido';
-  readonly unidadReferencia = 'mV';
-  readonly relatedProperties = ['ph', 'cec', 'espesor_doble_capa'];
-  readonly rangoFisicoMin = -100;
-  readonly rangoFisicoMax = 100;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Neurona directa canónica ARKON N036: runtime IA con Llama/Turso. */
+import { AgentNeuronN036 } from "../ai/neurons/N036_potencial_zeta";
+export class N036_PotencialZeta extends AgentNeuronN036 {}
