@@ -1,6 +1,5 @@
 import { AgenticNeuron } from "../agenticNeuron";
 import type { AINeuronProfile } from "../types";
-import { N047_EspesorDobleCapa } from "../../physical/N047_espesor_doble_capa";
 
 /** AI clone of direct ARKON neuron N-047; validates its original class at construction. */
 const definition: AINeuronProfile = {
@@ -144,10 +143,9 @@ const definition: AINeuronProfile = {
     ]
   }
 };
-const sourceNeuron = new N047_EspesorDobleCapa();
 
 export class AgentNeuronN047 extends AgenticNeuron {
-  constructor() { super(definition, sourceNeuron); }
+  constructor() { super(definition); }
 }
 
 export const AI_NEURON_N047 = new AgentNeuronN047();
