@@ -2,7 +2,7 @@ import type { NeuronDataProvider, NeuronDataVector, EstadoMaterial } from '../ba
 import { DIRECT_AI_NEURONS } from './neurons';
 import { searchTursoEvidence } from './tursoEvidence';
 import { requestLlamaAssessment } from './llamaClient';
-import type { AINeuronProfile, AIProductFamily } from './types';
+import type { AINeuronProfile, AIProductFamily, TursoEvidenceCandidate } from './types';
 import { supabase } from '../../supabase/client';
 
 function parseJson(raw: string): Record<string, unknown> | null {
@@ -39,6 +39,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
   private readonly cache = new Map<string, number | null>();
   private readonly vectorCache = new Map<string, NeuronDataVector>();
   private readonly materialNames = new Map<string, string>();
+  private readonly evidenceByProperty = new Map<string, TursoEvidenceCandidate[]>();
+  private readonly warningsByProperty = new Map<string, string[]>();
   private readonly family: AIProductFamily;
 
   constructor(
@@ -84,6 +86,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const search = await searchTursoEvidence(
       this.family, materialName, profile, materialId, (materialId.toUpperCase() === this.materialId.toUpperCase() && estado === this.state ? this.stateName : null) || (estado === 'E01' ? 'comercial inicial' : estado === 'E02' ? 'fraguado seco' : 'degradado'),
     );
+    this.evidenceByProperty.set(propertyName, search.evidence);
+    this.warningsByProperty.set(propertyName, search.warnings);
     if (!search.configured || search.evidence.length === 0) {
       this.cache.set(key, null);
       return null;
@@ -135,6 +139,23 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
       this.vectorCache.set(vectorKey, current);
     }
     return normalized;
+  }
+
+  getEvidenceAudit(): Array<{ aiNeuronId: string; neuronId: string; propertyName: string; evidence: TursoEvidenceCandidate[]; warnings: string[] }> {
+    return DIRECT_AI_NEURONS.map(neuron => {
+      const propertyName = neuron.propertyName;
+      const evidence = (this.evidenceByProperty.get(propertyName) ?? []).slice(0, 5).map(item => ({
+        ...item,
+        excerpt: item.excerpt.slice(0, 900),
+      }));
+      return {
+        aiNeuronId: neuron.id,
+        neuronId: neuron.sourceNeuronId,
+        propertyName,
+        evidence,
+        warnings: this.warningsByProperty.get(propertyName) ?? [],
+      };
+    }).filter(item => item.evidence.length > 0 || item.warnings.length > 0);
   }
 
   async getMaterialVector(materialId: string, estado: EstadoMaterial): Promise<NeuronDataVector | null> {
