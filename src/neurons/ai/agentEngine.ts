@@ -98,10 +98,12 @@ function relevantContextRows(value: unknown, profile: AINeuronProfile): unknown[
   if (!Array.isArray(value)) return [];
   const terms = [...profile.cables.map(c => c.propertyName), ...profile.subCables.flatMap(c => [c.id, c.purpose, ...c.requiredProperties])]
     .map(term => term.toLowerCase()).filter(term => term.length >= 3);
+  const neuronId = profile.coreNeuronId.toLowerCase();
   const matching = value.filter(item => {
     let serialized = '';
     try { serialized = JSON.stringify(item).toLowerCase(); } catch { return false; }
-    return terms.some(term => serialized.includes(term));
+    // reglas_mejora se vincula por neurona_id y puede no repetir el nombre de la propiedad.
+    return serialized.includes(neuronId) || terms.some(term => serialized.includes(term));
   });
   return safeContextRows(matching.slice(0, 10));
 }
