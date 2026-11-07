@@ -1,14 +1,5 @@
-import { NeuronBase } from '../base/NeuronBase';
+/** Neurona directa canónica ARKON N002: implementación IA con perfil, cables, subcables y motor Llama/Turso. */
+import { AgentNeuronN002 } from "../ai/neurons/N002_densidad_aparente";
 
-export class N002_DensidadAparente extends NeuronBase {
-  readonly neuronId = 'N-002';
-  readonly propertyName = 'densidad_aparente';
-  readonly orientation = 'direct';
-  readonly group = 'density';
-  readonly descripcion = 'Masa por unidad de volumen total (incluyendo poros)';
-  readonly unidadReferencia = 'g/cm³';
-  readonly relatedProperties = ['densidad_real', 'porosidad_total', 'absorcion_agua'];
-  readonly rangoFisicoMin = 0.1;
-  readonly rangoFisicoMax = 3.0;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Mantiene el nombre/clase pública histórica para compatibilidad; el runtime es la neurona-agente IA. */
+export class N002_DensidadAparente extends AgentNeuronN002 {}
