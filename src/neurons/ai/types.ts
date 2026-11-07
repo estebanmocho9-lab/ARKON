@@ -23,6 +23,7 @@ export interface AINeuronSourceMetadata {
   referenceUnit: string;
   physicalRange: { min: number | null; max: number | null };
   relatedProperties: string[];
+  confidenceDefault?: number;
 }
 
 export interface AINeuronProfile {
