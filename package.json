@@ -38,7 +38,8 @@
     "definir:08": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 08",
     "definir:09": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 09",
     "definir:10": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts 10",
-    "definir:todas": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts todas"
+    "definir:todas": "ts-node --transpile-only src/extraction-neurons/runDefiniciones.ts todas",
+    "sync:ai-turso": "ts-node --transpile-only src/extraction-neurons/sheets/syncNDSheetsToAITurso.ts"
   },
   "keywords": [],
   "author": "",
