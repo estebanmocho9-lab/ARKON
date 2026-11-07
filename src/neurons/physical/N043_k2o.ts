@@ -139,7 +139,8 @@ const definition: AINeuronProfile = {
       "na2o",
       "cec",
       "ph"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
