@@ -161,7 +161,8 @@ const definition: AINeuronProfile = {
       "porosidad_total",
       "permeabilidad_intrinseca",
       "angulo_contacto"
-    ]
+    ],
+    "confidenceDefault": 0.95
   }
 };
 
