@@ -219,7 +219,7 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
     .flatMap(property => [`propiedad_a.eq.${property}`, `propiedad_b.eq.${property}`])
     .join(',');
 
-  const [improvementRules, mixingRules, formulas, crosses, contradictions] = await Promise.all([
+  const [improvementRules, mixingRules, formulas, crosses, trizImproves, trizWorsens] = await Promise.all([
     supabase.from('reglas_mejora')
       .select('id, neurona_id, condicion, solucion, prioridad')
       .order('prioridad', { ascending: true })
@@ -237,11 +237,18 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
     supabase.from('cruces_cientificos')
       .select('*')
       .eq('activo', true)
-      .limit(60),
+      .overlaps('propiedades_requeridas', properties)
+      .limit(100),
     supabase.from('triz_contradicciones')
       .select('*')
       .eq('activo', true)
-      .limit(60),
+      .overlaps('propiedades_mejora', properties)
+      .limit(100),
+    supabase.from('triz_contradicciones')
+      .select('*')
+      .eq('activo', true)
+      .overlaps('propiedades_empeora', properties)
+      .limit(100),
   ]);
 
   const propertySet = new Set(properties);
@@ -249,7 +256,8 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
     const required = Array.isArray(row.propiedades_requeridas) ? row.propiedades_requeridas : [];
     return required.some((property: unknown) => typeof property === 'string' && propertySet.has(property));
   });
-  const trizForNeuron = (contradictions.data ?? []).filter((row: any) => {
+  const trizRows = [...(trizImproves.data ?? []), ...(trizWorsens.data ?? [])];
+  const trizForNeuron = trizRows.filter((row: any) => {
     const parseProperties = (value: unknown): string[] => {
       if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
       if (typeof value !== 'string') return [];
