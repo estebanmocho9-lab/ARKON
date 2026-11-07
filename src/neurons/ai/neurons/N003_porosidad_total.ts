@@ -1,6 +1,5 @@
 import { AgenticNeuron } from "../agenticNeuron";
 import type { AINeuronProfile } from "../types";
-import { N003_PorosidadTotal } from "../../physical/N003_porosidad_total";
 
 /** AI clone of direct ARKON neuron N-003; validates its original class at construction. */
 const definition: AINeuronProfile = {
@@ -147,10 +146,9 @@ const definition: AINeuronProfile = {
     ]
   }
 };
-const sourceNeuron = new N003_PorosidadTotal();
 
 export class AgentNeuronN003 extends AgenticNeuron {
-  constructor() { super(definition, sourceNeuron); }
+  constructor() { super(definition); }
 }
 
 export const AI_NEURON_N003 = new AgentNeuronN003();
