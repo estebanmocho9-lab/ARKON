@@ -54,7 +54,12 @@ export abstract class NeuronBase {
           valorCompuesto = Math.min(100, Math.max(0, valorFuente));
           componentesUsados = 1;
         } else {
-          return this.outputVacio(input, `Sin dato en NORMALIZACION para ${input.materialId}/${this.propertyName}`);
+          const razon = input.dataProvider
+            ? `Sin dato normalizado ARKON 0–100 verificable en Turso para ${input.materialId}/${this.propertyName}; la evidencia documental se conserva para revisión.`
+            : this.orientation === 'direct'
+              ? `Neurona directa sin proveedor cerebral para ${input.materialId}/${this.propertyName}; no se consulta Google Sheets.`
+              : `Sin dato en NORMALIZACION para ${input.materialId}/${this.propertyName}`;
+          return this.outputVacio(input, razon);
         }
       }
 
