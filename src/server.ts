@@ -9,6 +9,7 @@ import { supabase } from './supabase/client';
 import { MotorInferencia } from './inference/MotorInferencia';
 import { analyzeWithLlamaMotherBrain, runAINeuronCalculations, llamaMotherBrain } from './neurons/ai/motherBrain';
 import { getAINeuronTursoClient } from './neurons/ai/aiTursoClient';
+import { LlamaTursoDataProvider } from './neurons/ai/llamaTursoDataProvider';
 
 dotenv.config();
 
@@ -313,10 +314,12 @@ app.post('/api/analizar', async (req, res) => {
       });
     }
 
-    const vector = await getVectorFromSheet(materialId);
-    if (!vector) return res.status(422).json({ ok: false, error: `No existe vector real en NORMALIZACION para ${materialId}.`, producto: { id: product.id, nombre: product.nombre, materialId } });
-
-    const activacion = await activarNeuronas(materialId, 'general', estado);
+    // Un mismo proveedor cerebral atiende las 50 directas durante toda esta petición.
+    // Las 50 inversas siguen usando su vector original dentro de activationEngine.
+    const estadoProveedor = estado === 'E02' || estado === 'E03' ? estado : 'E01';
+    const nombreEstado = typeof req.body?.estadoNombre === 'string' ? req.body.estadoNombre : null;
+    const proveedorDirectas = new LlamaTursoDataProvider(materialId, product.nombre, estadoProveedor, nombreEstado);
+    const activacion = await activarNeuronas(materialId, 'general', estado, proveedorDirectas);
 
     const problemasDetectados = activacion.neuronasActivadas
       .map(n => ({
@@ -347,6 +350,7 @@ app.post('/api/analizar', async (req, res) => {
           materialId,
           estado: estado === 'E02' || estado === 'E03' ? estado : 'E01',
           componentes: [],
+          dataProvider: proveedorDirectas,
         });
         analisisProblemas.push({ nombreProblema: nombre, ok: true, resultado });
       } catch (error) {
@@ -450,20 +454,21 @@ app.post('/api/analizar', async (req, res) => {
     const anomalias = activacion.neuronasActivadas.flatMap((n: any) => (n.anomalias ?? []).map((a: any) => ({ neuronId: n.neuronId, propertyName: n.propertyName, detalle: String(a) })));
     const errores = [
       ...anomalias.map((a: any) => `${a.propertyName}: ${a.detalle}`),
-      ...activacion.propiedadesPendientes.map(prop => `Sin dato real en NORMALIZACION: ${prop}`),
+      ...activacion.propiedadesPendientes.map(prop => `Sin dato verificable en la fuente asignada a la neurona: ${prop}`),
       ...analisisProblemas.filter(p => !p.ok).map(p => `${p.nombreProblema}: ${p.error}`),
     ];
 
     return res.json({
       ok: true,
       motor: 'ARKON REAL',
-      fuente: 'Supabase + Google Sheets NORMALIZACION',
+      fuente: 'Turso documental para neuronas directas + fuente original de vectores para inversas + Supabase científico',
       producto: { id: product.id, nombre: product.nombre, materialId, contexto: product.contexto ?? contexto },
       diagnosticoIntegral: {
         cobertura: { neuronasConDatos: activacion.neuronasConDatos, totalNeuronas: activacion.totalNeuronas, coberturaPorc: activacion.coberturaPorc, confianzaPromedio: activacion.confianzaPromedio },
         problemasDetectados,
         anomalias,
         propiedadesPendientes: activacion.propiedadesPendientes,
+        evidenciaTurso: activacion.evidenciaTurso,
         soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales },
         formulas: formulasRelacionadas,
         cruces: crucesDisponibles,
@@ -482,7 +487,7 @@ app.post('/api/analizar', async (req, res) => {
         },
       },
       materiales: [{ materialId, resultado: { ...activacion, errores, mejoras: mejorasReales, reglasMejora: solucionesReglas, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas } }],
-      resultado: { activacion, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas, ...(aiNeurons ? { neuronasIA: aiNeurons } : {}) },
+      resultado: { activacion, evidenciaTurso: activacion.evidenciaTurso, problemasDetectados, anomalias, errores, propiedadesPendientes: activacion.propiedadesPendientes, soluciones: { reglas_mejora: solucionesReglas, mejoras: mejorasReales }, formulas: formulasRelacionadas, cruces: crucesDisponibles, triz: trizRelacionadas, analisisProblemas, ...(aiNeurons ? { neuronasIA: aiNeurons } : {}) },
       ...(aiNeurons ? { aiNeurons } : {}),
     });
   } catch (error) {
