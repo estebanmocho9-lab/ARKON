@@ -140,7 +140,8 @@ const definition: AINeuronProfile = {
       "al2o3",
       "cao",
       "ph"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
