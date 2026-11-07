@@ -122,7 +122,8 @@ const definition: AINeuronProfile = {
       "resistencia_compresion",
       "poisson",
       "modulo_corte"
-    ]
+    ],
+    "confidenceDefault": 0.97
   }
 };
 
