@@ -24,7 +24,7 @@ export class AgenticNeuron extends NeuronBase {
     this.profile = profile;
     this.rangoFisicoMin = profile.sourceNeuron?.physicalRange?.min ?? undefined;
     this.rangoFisicoMax = profile.sourceNeuron?.physicalRange?.max ?? undefined;
-    this.confianzaPorDefecto = 0.95;
+    this.confianzaPorDefecto = profile.sourceNeuron?.confidenceDefault ?? 0.95;
   }
 
   get neuronId(): string { return this.profile.coreNeuronId; }
