@@ -1,14 +1,3 @@
-import { NeuronBase } from '../base/NeuronBase';
-
-export class N023_ExpansionTermica extends NeuronBase {
-  readonly neuronId = 'N-023';
-  readonly propertyName = 'expansion_termica';
-  readonly orientation = 'direct';
-  readonly group = 'thermal';
-  readonly descripcion = 'Coeficiente de expansión térmica lineal';
-  readonly unidadReferencia = '10^-6/K';
-  readonly relatedProperties = ['modulo_young', 'resistencia_traccion', 'temperatura_servicio'];
-  readonly rangoFisicoMin = 0;
-  readonly rangoFisicoMax = 50;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Neurona directa canónica ARKON N023: runtime IA con Llama/Turso. */
+import { AgentNeuronN023 } from "../ai/neurons/N023_expansion_termica";
+export class N023_ExpansionTermica extends AgentNeuronN023 {}
