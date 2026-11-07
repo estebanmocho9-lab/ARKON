@@ -9,6 +9,8 @@ import type { NeuronInput, NeuronOutput } from '../base/tipos';
  */
 export class AgenticNeuron extends NeuronBase {
   readonly profile: AINeuronProfile;
+  readonly rangoFisicoMin?: number;
+  readonly rangoFisicoMax?: number;
   private readonly sourceNeuron: NeuronBase;
 
   constructor(profile: AINeuronProfile, sourceNeuron: NeuronBase) {
@@ -17,6 +19,8 @@ export class AgenticNeuron extends NeuronBase {
       throw new Error(`La neurona IA ${profile.id} no coincide con su fuente ${sourceNeuron.neuronId}/${sourceNeuron.propertyName}.`);
     }
     this.sourceNeuron = sourceNeuron;
+    this.rangoFisicoMin = sourceNeuron.rangoFisicoMin;
+    this.rangoFisicoMax = sourceNeuron.rangoFisicoMax;
     this.profile = {
       ...profile,
       sourceNeuron: {
@@ -40,8 +44,6 @@ export class AgenticNeuron extends NeuronBase {
   get relatedProperties(): string[] { return [...this.sourceNeuron.relatedProperties]; }
   get descripcion(): string { return this.sourceNeuron.descripcion; }
   get unidadReferencia(): string { return this.sourceNeuron.unidadReferencia; }
-  get rangoFisicoMin(): number | undefined { return this.sourceNeuron.rangoFisicoMin; }
-  get rangoFisicoMax(): number | undefined { return this.sourceNeuron.rangoFisicoMax; }
 
   get id(): string {
     return this.profile.id;
