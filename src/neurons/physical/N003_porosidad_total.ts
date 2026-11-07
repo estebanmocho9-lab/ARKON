@@ -143,7 +143,8 @@ const definition: AINeuronProfile = {
       "densidad_aparente",
       "absorcion_agua",
       "resistencia_compresion"
-    ]
+    ],
+    "confidenceDefault": 0.95
   }
 };
 
