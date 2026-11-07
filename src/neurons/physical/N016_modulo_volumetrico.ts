@@ -142,7 +142,8 @@ const definition: AINeuronProfile = {
       "modulo_young",
       "poisson",
       "modulo_corte"
-    ]
+    ],
+    "confidenceDefault": 0.97
   }
 };
 
