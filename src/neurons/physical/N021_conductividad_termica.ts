@@ -1,14 +1,3 @@
-import { NeuronBase } from '../base/NeuronBase';
-
-export class N021_ConductividadTermica extends NeuronBase {
-  readonly neuronId = 'N-021';
-  readonly propertyName = 'conductividad_termica';
-  readonly orientation = 'direct';
-  readonly group = 'thermal';
-  readonly descripcion = 'Capacidad de transmitir calor por conducción';
-  readonly unidadReferencia = 'W/(m·K)';
-  readonly relatedProperties = ['porosidad_total', 'calor_especifico', 'difusividad_termica'];
-  readonly rangoFisicoMin = 0.01;
-  readonly rangoFisicoMax = 500;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Neurona directa canónica ARKON N021: runtime IA con Llama/Turso. */
+import { AgentNeuronN021 } from "../ai/neurons/N021_conductividad_termica";
+export class N021_ConductividadTermica extends AgentNeuronN021 {}
