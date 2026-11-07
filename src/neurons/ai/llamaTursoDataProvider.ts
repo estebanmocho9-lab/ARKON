@@ -96,6 +96,21 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const payload = {
       task: 'Seleccionar un dato ya normalizado por ARKON. No calcular, estimar ni convertir unidades.',
       required: { materialId, materialName, propertyName, state: estado, normalizedScale: '0-100' },
+      // La ficha completa de la neurona IA gobierna la búsqueda; el núcleo exacto
+      // evita confundir una propiedad relacionada con la propiedad que se solicita.
+      neuronProfile: {
+        id: profile.id,
+        coreNeuronId: profile.coreNeuronId,
+        corePropertyName: profile.corePropertyName,
+        name: profile.name,
+        attribute: profile.attribute,
+        nucleus: profile.nucleus,
+        methodGuidance: profile.methodGuidance,
+        sourceNeuron: profile.sourceNeuron,
+        cables: profile.cables,
+        subCables: profile.subCables,
+        evidenceTerms: profile.evidenceTerms,
+      },
       candidates: search.evidence.map(item => ({
         id: item.id, material: item.material, property: item.property, rawValue: item.rawValue,
         unit: item.unit, condition: item.condition, method: item.method, document: item.document,
@@ -104,7 +119,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
       responseSchema: { evidenceId: 'ID exacto de candidato', value: 'número exacto de rawValue', unit: 'unidad exacta', normalizedScale: '0-100 solo si la fuente lo declara explícitamente; de lo contrario null' },
     };
     const answer = await requestLlamaAssessment(
-      'Actúas como intermediario de recuperación documental de ARKON. Elige un candidato solo si coincide exactamente con material, propiedad y estado, y la fuente declara explícitamente que el valor ya está normalizado en escala ARKON 0–100. No conviertas porcentajes físicos ni valores de laboratorio. Si no existe coincidencia inequívoca, responde evidenceId=null, value=null, unit=null, normalizedScale=null. Devuelve únicamente JSON.',
+      'Actúas como intermediario de recuperación documental de ARKON para la neurona IA indicada en neuronProfile. Respeta su núcleo científico, cables y método; solo puedes seleccionar evidencia de la propiedad núcleo exacta, nunca sustituirla por una propiedad relacionada o inversa. El candidato debe coincidir exactamente con material, propiedad y estado, y la fuente debe declarar explícitamente que el valor ya está normalizado en escala ARKON 0–100. No conviertas porcentajes físicos ni valores de laboratorio, no apliques rangos físicos para normalizar y no calcules fórmulas. Si no existe coincidencia inequívoca, responde evidenceId=null, value=null, unit=null, normalizedScale=null. Devuelve únicamente JSON.',
       payload,
     );
     const parsed = parseJson(answer);
