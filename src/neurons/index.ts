@@ -68,8 +68,8 @@ import { N100_NoReciclable } from './inverse/N100_no_reciclable';
 
 // Lista completa de las 100 neuronas
 export const ALL_NEURONS: NeuronBase[] = [
-  // Directas (N001–N050): perfiles IA canónicos que delegan el cálculo científico
-  // en su clase física original y reciben el proveedor Llama/Turso.
+  // Directas (N001–N050): clases físicas canónicas con núcleo, cables y subcables IA
+  // integrados en cada módulo; el proveedor Llama/Turso se inyecta al activarlas.
   ...DIRECT_AI_NEURONS,
   // Inversas (N051–N100)
   new N051_VolumenEspecificoReal(),
