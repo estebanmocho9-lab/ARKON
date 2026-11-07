@@ -184,6 +184,78 @@ function noEvidenceResult(profile: AINeuronProfile, family: AIProductFamily, sta
   };
 }
 
+type LoadedScientificContext = {
+  rules: unknown[];
+  formulas: unknown[];
+  scientificCrosses: unknown[];
+  triz: unknown[];
+};
+
+/** Recupera de Supabase las reglas científicas conectadas al núcleo y sus cables. */
+async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<LoadedScientificContext> {
+  const properties = [...new Set([
+    profile.corePropertyName,
+    ...profile.cables.map(cable => cable.propertyName),
+    ...profile.subCables.flatMap(cable => cable.requiredProperties),
+    ...(profile.sourceNeuron?.relatedProperties ?? []),
+  ])];
+  const formulaFilter = properties
+    .flatMap(property => [`propiedad_a.eq.${property}`, `propiedad_b.eq.${property}`])
+    .join(',');
+
+  const [improvementRules, mixingRules, formulas, crosses, contradictions] = await Promise.all([
+    supabase.from('reglas_mejora')
+      .select('id, neurona_id, condicion, solucion, prioridad')
+      .eq('neurona_id', profile.coreNeuronId)
+      .order('prioridad', { ascending: true })
+      .limit(20),
+    supabase.from('reglas_mezcla')
+      .select('propiedad_nombre, formula, activo, tipo_material_aplica')
+      .eq('propiedad_nombre', profile.corePropertyName)
+      .eq('activo', true)
+      .limit(20),
+    supabase.from('scientific_formulas')
+      .select('id, nombre, descripcion, ecuacion, forma_computable, propiedad_a, propiedad_b, tipo_relacion, output_nombre, peso_cientifico, confianza')
+      .or(formulaFilter)
+      .order('peso_cientifico', { ascending: false })
+      .limit(30),
+    supabase.from('cruces_cientificos')
+      .select('*')
+      .eq('activo', true)
+      .limit(60),
+    supabase.from('triz_contradicciones')
+      .select('*')
+      .eq('activo', true)
+      .limit(60),
+  ]);
+
+  const propertySet = new Set(properties);
+  const crossesForNeuron = (crosses.data ?? []).filter((row: any) => {
+    const required = Array.isArray(row.propiedades_requeridas) ? row.propiedades_requeridas : [];
+    return required.some((property: unknown) => typeof property === 'string' && propertySet.has(property));
+  });
+  const trizForNeuron = (contradictions.data ?? []).filter((row: any) => {
+    const parseProperties = (value: unknown): string[] => {
+      if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+      if (typeof value !== 'string') return [];
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+      } catch { return []; }
+    };
+    const improves = parseProperties(row.propiedades_mejora);
+    const worsens = parseProperties(row.propiedades_empeora);
+    return [...improves, ...worsens].some(property => propertySet.has(property));
+  });
+
+  return {
+    rules: [...(improvementRules.data ?? []), ...(mixingRules.data ?? [])],
+    formulas: formulas.data ?? [],
+    scientificCrosses: crossesForNeuron,
+    triz: trizForNeuron,
+  };
+}
+
 async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, family: AIProductFamily): Promise<AINeuronRunResult> {
   const profile = neuron.profile;
   const stateCode = boundedText(input.stateCode, 32) || null;
@@ -198,10 +270,11 @@ async function runProfile(neuron: AgenticNeuron, input: AINeuronAnalysisInput, f
   }
   if (!search.evidence.length) return noEvidenceResult(profile, family, stateCode, 'Turso está configurado, pero esta consulta no encontró fragmentos trazables del producto/propiedades solicitados; no se solicitó a Llama que rellene el dato.');
 
-  const usableRules = relevantContextRows(input.scientificContext?.rules, profile);
-  const usableFormulas = relevantContextRows(input.scientificContext?.formulas, profile);
-  const usableCrosses = relevantContextRows(input.scientificContext?.scientificCrosses, profile);
-  const usableTriz = relevantContextRows(input.scientificContext?.triz, profile);
+  const supabaseContext = await loadSupabaseScientificContext(profile);
+  const usableRules = relevantContextRows([...(input.scientificContext?.rules ?? []), ...supabaseContext.rules], profile);
+  const usableFormulas = relevantContextRows([...(input.scientificContext?.formulas ?? []), ...supabaseContext.formulas], profile);
+  const usableCrosses = relevantContextRows([...(input.scientificContext?.scientificCrosses ?? []), ...supabaseContext.scientificCrosses], profile);
+  const usableTriz = relevantContextRows([...(input.scientificContext?.triz ?? []), ...supabaseContext.triz], profile);
   const payload = {
     product: { name: boundedText(input.productName, 160), materialName: boundedText(input.materialName || '', 160) || null, id: input.productId ?? null, materialId: input.materialId ?? null, composition: safeComposition(input.composition), family, knownAliases: candidateFamilies()[family] },
     requestedState: { code: stateCode, name: boundedText(stateName, 100) || null, explicitlyProvided: Boolean(stateCode || stateName) },
