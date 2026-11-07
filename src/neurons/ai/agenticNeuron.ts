@@ -7,7 +7,7 @@ import type { NeuronInput, NeuronOutput } from '../base/tipos';
  * Each N001–N050 module owns one instance of this class with its own nucleus,
  * measurement cables, Supabase sub-cables and evidence-search terms.
  */
-export class AgenticNeuron {
+export class AgenticNeuron extends NeuronBase {
   readonly profile: AINeuronProfile;
   private readonly sourceNeuron: NeuronBase;
 
@@ -32,6 +32,17 @@ export class AgenticNeuron {
     };
   }
 
+  /** NeuronBase contract: the AI profile is now the canonical direct-neuron runtime. */
+  get neuronId(): string { return this.sourceNeuron.neuronId; }
+  get propertyName(): string { return this.profile.corePropertyName; }
+  get orientation(): 'direct' | 'inverse' { return 'direct'; }
+  get group(): string { return this.sourceNeuron.group; }
+  get relatedProperties(): string[] { return [...this.sourceNeuron.relatedProperties]; }
+  get descripcion(): string { return this.sourceNeuron.descripcion; }
+  get unidadReferencia(): string { return this.sourceNeuron.unidadReferencia; }
+  get rangoFisicoMin(): number | undefined { return this.sourceNeuron.rangoFisicoMin; }
+  get rangoFisicoMax(): number | undefined { return this.sourceNeuron.rangoFisicoMax; }
+
   get id(): string {
     return this.profile.id;
   }
@@ -45,7 +56,7 @@ export class AgenticNeuron {
   }
 
   /** Run the original scientific neuron unchanged, with the selected data provider. */
-  process(input: NeuronInput): Promise<NeuronOutput> {
+  override process(input: NeuronInput): Promise<NeuronOutput> {
     return this.sourceNeuron.process(input);
   }
 
