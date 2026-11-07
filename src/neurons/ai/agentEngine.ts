@@ -210,7 +210,7 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
       .order('prioridad', { ascending: true })
       .limit(20),
     supabase.from('reglas_mezcla')
-      .select('propiedad_nombre, formula, activo, tipo_material_aplica')
+      .select('propiedad_nombre, formula, descripcion, activo')
       .eq('propiedad_nombre', profile.corePropertyName)
       .eq('activo', true)
       .limit(20),
