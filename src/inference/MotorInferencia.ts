@@ -58,6 +58,9 @@ export class MotorInferencia {
           ? input
           : { ...input, dataProvider: undefined };
         const output = await neurona.process(neuronInput);
+        if (output.propiedadPendiente) {
+          throw new Error(`Falta evidencia normalizada verificable para ${propName}; no se usará el valor de reserva 50 en un cruce científico.`);
+        }
         return { propName, output };
       })
     );
