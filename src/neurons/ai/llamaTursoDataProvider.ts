@@ -2,7 +2,7 @@ import type { NeuronDataProvider, NeuronDataVector, EstadoMaterial } from '../ba
 import { DIRECT_AI_NEURONS } from './neurons';
 import { searchTursoEvidence } from './tursoEvidence';
 import { requestLlamaAssessment } from './llamaClient';
-import type { AINeuronProfile, AIProductFamily } from './types';
+import type { AINeuronProfile, AIProductFamily, TursoEvidenceCandidate } from './types';
 import { supabase } from '../../supabase/client';
 
 function parseJson(raw: string): Record<string, unknown> | null {
@@ -39,6 +39,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
   private readonly cache = new Map<string, number | null>();
   private readonly vectorCache = new Map<string, NeuronDataVector>();
   private readonly materialNames = new Map<string, string>();
+  private readonly evidenceByProperty = new Map<string, TursoEvidenceCandidate[]>();
+  private readonly warningsByProperty = new Map<string, string[]>();
   private readonly family: AIProductFamily;
 
   constructor(
@@ -84,6 +86,8 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const search = await searchTursoEvidence(
       this.family, materialName, profile, materialId, (materialId.toUpperCase() === this.materialId.toUpperCase() && estado === this.state ? this.stateName : null) || (estado === 'E01' ? 'comercial inicial' : estado === 'E02' ? 'fraguado seco' : 'degradado'),
     );
+    this.evidenceByProperty.set(propertyName, search.evidence);
+    this.warningsByProperty.set(propertyName, search.warnings);
     if (!search.configured || search.evidence.length === 0) {
       this.cache.set(key, null);
       return null;
@@ -92,6 +96,21 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const payload = {
       task: 'Seleccionar un dato ya normalizado por ARKON. No calcular, estimar ni convertir unidades.',
       required: { materialId, materialName, propertyName, state: estado, normalizedScale: '0-100' },
+      // La ficha completa de la neurona IA gobierna la búsqueda; el núcleo exacto
+      // evita confundir una propiedad relacionada con la propiedad que se solicita.
+      neuronProfile: {
+        id: profile.id,
+        coreNeuronId: profile.coreNeuronId,
+        corePropertyName: profile.corePropertyName,
+        name: profile.name,
+        attribute: profile.attribute,
+        nucleus: profile.nucleus,
+        methodGuidance: profile.methodGuidance,
+        sourceNeuron: profile.sourceNeuron,
+        cables: profile.cables,
+        subCables: profile.subCables,
+        evidenceTerms: profile.evidenceTerms,
+      },
       candidates: search.evidence.map(item => ({
         id: item.id, material: item.material, property: item.property, rawValue: item.rawValue,
         unit: item.unit, condition: item.condition, method: item.method, document: item.document,
@@ -100,7 +119,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
       responseSchema: { evidenceId: 'ID exacto de candidato', value: 'número exacto de rawValue', unit: 'unidad exacta', normalizedScale: '0-100 solo si la fuente lo declara explícitamente; de lo contrario null' },
     };
     const answer = await requestLlamaAssessment(
-      'Actúas como intermediario de recuperación documental de ARKON. Elige un candidato solo si coincide exactamente con material, propiedad y estado, y la fuente declara explícitamente que el valor ya está normalizado en escala ARKON 0–100. No conviertas porcentajes físicos ni valores de laboratorio. Si no existe coincidencia inequívoca, responde evidenceId=null, value=null, unit=null, normalizedScale=null. Devuelve únicamente JSON.',
+      'Actúas como intermediario de recuperación documental de ARKON para la neurona IA indicada en neuronProfile. Respeta su núcleo científico, cables y método; solo puedes seleccionar evidencia de la propiedad núcleo exacta, nunca sustituirla por una propiedad relacionada o inversa. El candidato debe coincidir exactamente con material, propiedad y estado, y la fuente debe declarar explícitamente que el valor ya está normalizado en escala ARKON 0–100. No conviertas porcentajes físicos ni valores de laboratorio, no apliques rangos físicos para normalizar y no calcules fórmulas. Si no existe coincidencia inequívoca, responde evidenceId=null, value=null, unit=null, normalizedScale=null. Devuelve únicamente JSON.',
       payload,
     );
     const parsed = parseJson(answer);
@@ -114,8 +133,9 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const materialMatches = Boolean(candidateMaterial && requestedMaterial &&
       (candidateMaterial === requestedMaterial || candidateMaterial.includes(requestedMaterial) || requestedMaterial.includes(candidateMaterial)));
     const candidateProperty = normalizeLabel(candidate?.property ?? '');
-    const expectedProperties = [propertyName, ...profile.evidenceTerms].map(normalizeLabel);
-    const propertyMatches = Boolean(candidateProperty && expectedProperties.some(term => term && (candidateProperty === term || candidateProperty.includes(term) || term.includes(candidateProperty))));
+    const coreCable = profile.cables.find(cable => cable.propertyName === propertyName);
+    const expectedProperties = [propertyName, profile.attribute, coreCable?.measures ?? '', profile.sourceNeuron?.definition ?? ''].map(normalizeLabel).filter(Boolean);
+    const propertyMatches = Boolean(candidateProperty && expectedProperties.includes(candidateProperty));
     const valid = Boolean(
       candidate && materialMatches && propertyMatches &&
       Number.isFinite(value) &&
@@ -135,6 +155,23 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
       this.vectorCache.set(vectorKey, current);
     }
     return normalized;
+  }
+
+  getEvidenceAudit(): Array<{ aiNeuronId: string; neuronId: string; propertyName: string; evidence: TursoEvidenceCandidate[]; warnings: string[] }> {
+    return DIRECT_AI_NEURONS.map(neuron => {
+      const propertyName = neuron.propertyName;
+      const evidence = (this.evidenceByProperty.get(propertyName) ?? []).slice(0, 5).map(item => ({
+        ...item,
+        excerpt: item.excerpt.slice(0, 900),
+      }));
+      return {
+        aiNeuronId: neuron.id,
+        neuronId: neuron.sourceNeuronId,
+        propertyName,
+        evidence,
+        warnings: this.warningsByProperty.get(propertyName) ?? [],
+      };
+    });
   }
 
   async getMaterialVector(materialId: string, estado: EstadoMaterial): Promise<NeuronDataVector | null> {
