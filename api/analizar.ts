@@ -54,7 +54,7 @@ async function consultarCerebroIA(materialId: string, estado: string, neuronIds?
       body: JSON.stringify({ material_id: materialId, estado, ...(neuronIds?.length ? { neuronIds } : {}) }),
       signal: controller.signal,
     });
-    const payload = await response.json().catch(() => null);
+    const payload: any = await response.json().catch(() => null);
     if (!response.ok) {
       return { materialId, status: 'brain_request_failed', httpStatus: response.status, message: payload?.error ?? 'El cerebro madre rechazó la solicitud.' };
     }
@@ -76,7 +76,7 @@ function parseComposicion(value: unknown): Record<string, number> {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .map(([k, v]) => [k, Number(v)])
-        .filter(([, v]) => Number.isFinite(v) && v > 0)
+        .filter(([, v]) => Number.isFinite(Number(v)) && Number(v) > 0)
     );
   }
   if (typeof value === 'string') {
@@ -147,7 +147,7 @@ function descripcionPropiedad(prop: string, valor: number): string {
     reciclabilidad: 'reciclabilidad',
     impermeabilidad: 'impermeabilidad',
   };
-  const nombre = nombres[prop] ?? prop.replaceAll('_', ' ');
+  const nombre = nombres[prop] ?? prop.replace(/_/g, ' ');
   if (MAYOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel elevado según el umbral operativo del motor.`;
   if (MENOR_ES_PEOR.has(prop)) return `${nombre}: índice ${valor.toFixed(1)}/100 — nivel insuficiente según el umbral operativo del motor.`;
   return `${nombre}: índice ${valor.toFixed(1)}/100 — requiere revisión.`;
