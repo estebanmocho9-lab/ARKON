@@ -143,7 +143,8 @@ const definition: AINeuronProfile = {
       "tamaño_particula",
       "adsorcion",
       "porosidad_total"
-    ]
+    ],
+    "confidenceDefault": 0.97
   }
 };
 
