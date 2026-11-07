@@ -28,7 +28,8 @@ export interface NeuronInput {
   valorDirecto?: number | null;     // si es material puro y ya se conoce el índice normalizado 0-100
   componentes?: ComponenteBase[];   // si es una mezcla
   contexto?: Record<string, any>;   // temperatura, humedad, etc.
-  dataProvider?: NeuronDataProvider; // optional isolated provider for the AI clone; original calls omit it
+  dataProvider?: NeuronDataProvider; // cerebro Llama/Turso para neuronas directas
+  allowSheetsFallback?: boolean; // solo para dependencias directas solicitadas por una neurona inversa
   persistMemory?: boolean; // false for read-only AI evaluations; default preserves original behavior
 }
 
