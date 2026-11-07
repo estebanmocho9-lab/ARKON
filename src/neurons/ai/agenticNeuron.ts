@@ -14,6 +14,7 @@ export class AgenticNeuron extends NeuronBase {
   private readonly sourceNeuron: NeuronBase;
 
   constructor(profile: AINeuronProfile, sourceNeuron: NeuronBase) {
+    super();
     if (sourceNeuron.orientation !== 'direct') throw new Error(`La neurona IA ${profile.id} debe clonar una neurona directa.`);
     if (sourceNeuron.neuronId !== profile.coreNeuronId || sourceNeuron.propertyName !== profile.corePropertyName) {
       throw new Error(`La neurona IA ${profile.id} no coincide con su fuente ${sourceNeuron.neuronId}/${sourceNeuron.propertyName}.`);
@@ -51,10 +52,6 @@ export class AgenticNeuron extends NeuronBase {
 
   get sourceNeuronId(): string {
     return this.profile.coreNeuronId;
-  }
-
-  get propertyName(): string {
-    return this.profile.corePropertyName;
   }
 
   /** Run the original scientific neuron unchanged, with the selected data provider. */
