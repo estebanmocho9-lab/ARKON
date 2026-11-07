@@ -143,7 +143,8 @@ const definition: AINeuronProfile = {
       "densidad_aparente",
       "porosidad_total",
       "resistencia_compresion"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
