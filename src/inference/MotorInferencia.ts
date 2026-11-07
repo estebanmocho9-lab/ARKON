@@ -54,7 +54,10 @@ export class MotorInferencia {
       Array.from(propiedadesUnicas).map(async (propName) => {
         const neurona = NEURON_MAP[propName];
         if (!neurona) throw new Error(`Neurona no encontrada para propiedad '${propName}'`);
-        const output = await neurona.process(input);
+        const neuronInput: NeuronInput = neurona.orientation === 'direct'
+          ? input
+          : { ...input, dataProvider: undefined };
+        const output = await neurona.process(neuronInput);
         return { propName, output };
       })
     );
