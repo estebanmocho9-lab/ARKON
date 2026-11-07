@@ -47,7 +47,7 @@ export abstract class NeuronBase {
       } else {
         const valorFuente = input.dataProvider
           ? await input.dataProvider.getNormalizedValue(input.materialId, this.propertyName, input.estado)
-          : this.orientation === 'direct'
+          : this.orientation === 'direct' && input.allowSheetsFallback !== true
             ? null
             : await getValorNormalizado(input.materialId, this.propertyName, input.estado);
         if (valorFuente !== null && !isNaN(valorFuente)) {
@@ -118,7 +118,7 @@ export abstract class NeuronBase {
     for (const comp of componentes) {
       const valor = input.dataProvider
         ? await input.dataProvider.getNormalizedValue(comp.materialId, this.propertyName, input.estado)
-        : this.orientation === 'direct'
+        : this.orientation === 'direct' && input.allowSheetsFallback !== true
           ? null
           : await getValorNormalizado(comp.materialId, this.propertyName, input.estado);
       if (valor === null || isNaN(valor)) {
@@ -274,7 +274,7 @@ export abstract class NeuronBase {
     // propiedad_a/propriedad_b son las únicas variables disponibles.
     const vectors = input.dataProvider
       ? await input.dataProvider.getMaterialVector(input.materialId, input.estado)
-      : this.orientation === 'direct'
+      : this.orientation === 'direct' && input.allowSheetsFallback !== true
         ? null
         : await readVectorsFromSheet();
     const materialVector = Array.isArray(vectors)
@@ -326,6 +326,9 @@ export abstract class NeuronBase {
               ...input,
               valorDirecto: undefined,
               dataProvider: neuronaDependiente.orientation === 'direct' ? input.dataProvider : undefined,
+              allowSheetsFallback: this.orientation === 'inverse' && neuronaDependiente.orientation === 'direct'
+                ? true
+                : input.allowSheetsFallback,
             };
             const otraOutput = await neuronaDependiente.process(otraInput);
             if (!otraOutput.propiedadPendiente && Number.isFinite(Number(otraOutput.valorCompuesto))) {
