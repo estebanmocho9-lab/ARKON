@@ -143,7 +143,8 @@ const definition: AINeuronProfile = {
       "area_BET",
       "volumen_poro",
       "porosidad_total"
-    ]
+    ],
+    "confidenceDefault": 0.95
   }
 };
 
