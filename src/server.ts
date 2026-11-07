@@ -531,10 +531,4 @@ app.get('/api/neurons', (_req, res) => {
   res.json(ALL_NEURONS.map(n => ({ name: n.constructor.name, propertyName: n.propertyName, group: n.group, unit: n.unidadReferencia })));
 });
 
-// Vercel importa esta aplicación como una Function. En ejecución local,
-// el listener sigue arrancando para conservar npm run dev y el gateway actual.
-export default app;
-
-if (require.main === module) {
-  app.listen(PORT, () => console.log(`✅ ARKON Neural Engine Server running on port ${PORT}`));
-}
+app.listen(PORT, () => console.log(`✅ ARKON Neural Engine Server running on port ${PORT}`));
