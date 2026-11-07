@@ -60,7 +60,7 @@ function physicalConstructor(module: Record<string, unknown>): PhysicalNeuronCon
 
 /**
  * Las 50 neuronas directas activas se instancian desde src/neurons/physical.
- * Cada clase física es ahora el wrapper canónico de su perfil IA individual.
+ * Cada clase física contiene su perfil IA completo y es la fuente canónica N001–N050.
  */
 export const DIRECT_AI_NEURONS: AgenticNeuron[] = [
   new (physicalConstructor(Physical001 as unknown as Record<string, unknown>))(), // N001_densidad_real.ts
