@@ -94,15 +94,29 @@ function safeComposition(value: unknown): unknown {
   return null;
 }
 
+function normalizeScientificTerm(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/_/g, ' ');
+}
+
 function relevantContextRows(value: unknown, profile: AINeuronProfile): unknown[] {
   if (!Array.isArray(value)) return [];
-  const terms = [...profile.cables.map(c => c.propertyName), ...profile.subCables.flatMap(c => [c.id, c.purpose, ...c.requiredProperties])]
-    .map(term => term.toLowerCase()).filter(term => term.length >= 3);
-  const neuronId = profile.coreNeuronId.toLowerCase();
+  const rawTerms = [
+    profile.corePropertyName,
+    ...profile.cables.flatMap(c => [c.propertyName, ...c.searchTerms]),
+    ...profile.subCables.flatMap(c => [c.id, c.purpose, ...c.requiredProperties]),
+    ...profile.evidenceTerms,
+    ...(profile.sourceNeuron?.relatedProperties ?? []),
+  ];
+  const stopWords = new Set(['para', 'desde', 'sobre', 'entre', 'cuando', 'donde', 'como', 'esta', 'este', 'tiene', 'debe', 'con', 'por', 'del']);
+  const terms = [...new Set(rawTerms.flatMap(term => {
+    const normalized = normalizeScientificTerm(term);
+    return [normalized, ...normalized.split(/[^a-z0-9]+/)];
+  }))].filter(term => term.length >= 4 && !stopWords.has(term));
+  const neuronId = normalizeScientificTerm(profile.coreNeuronId);
   const matching = value.filter(item => {
     let serialized = '';
-    try { serialized = JSON.stringify(item).toLowerCase(); } catch { return false; }
-    // reglas_mejora se vincula por neurona_id y puede no repetir el nombre de la propiedad.
+    try { serialized = normalizeScientificTerm(JSON.stringify(item)); } catch { return false; }
+    // reglas_mejora usa categorías semánticas (PESO, ABSORCION, etc.), no siempre N-001.
     return serialized.includes(neuronId) || terms.some(term => serialized.includes(term));
   });
   return safeContextRows(matching.slice(0, 10));
@@ -208,9 +222,8 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
   const [improvementRules, mixingRules, formulas, crosses, contradictions] = await Promise.all([
     supabase.from('reglas_mejora')
       .select('id, neurona_id, condicion, solucion, prioridad')
-      .eq('neurona_id', profile.coreNeuronId)
       .order('prioridad', { ascending: true })
-      .limit(20),
+      .limit(200),
     supabase.from('reglas_mezcla')
       .select('propiedad_nombre, formula, descripcion, activo')
       .eq('propiedad_nombre', profile.corePropertyName)
