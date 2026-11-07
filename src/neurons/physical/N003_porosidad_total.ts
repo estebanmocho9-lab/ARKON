@@ -1,14 +1,5 @@
-import { NeuronBase } from '../base/NeuronBase';
+/** Neurona directa canónica ARKON N003: implementación IA con perfil, cables, subcables y motor Llama/Turso. */
+import { AgentNeuronN003 } from "../ai/neurons/N003_porosidad_total";
 
-export class N003_PorosidadTotal extends NeuronBase {
-  readonly neuronId = 'N-003';
-  readonly propertyName = 'porosidad_total';
-  readonly orientation = 'direct';
-  readonly group = 'porosity';
-  readonly descripcion = 'Fracción de volumen de vacíos respecto al volumen total';
-  readonly unidadReferencia = '%';
-  readonly relatedProperties = ['densidad_aparente', 'absorcion_agua', 'resistencia_compresion'];
-  readonly rangoFisicoMin = 0;
-  readonly rangoFisicoMax = 100;
-  readonly confianzaPorDefecto = 0.95;
-}
+/** Mantiene el nombre/clase pública histórica para compatibilidad; el runtime es la neurona-agente IA. */
+export class N003_PorosidadTotal extends AgentNeuronN003 {}
