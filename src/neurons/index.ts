@@ -2,7 +2,7 @@ import { NeuronBase } from './base/NeuronBase';
 export type { NeuronInput, NeuronOutput } from './base/NeuronBase';
 
 // Las 50 directas activas son ahora sus perfiles IA N001–N050.
-import { DIRECT_AI_NEURONS } from './neurons/ai/neurons';
+import { DIRECT_AI_NEURONS } from './ai/neurons';
 
 // ── INVERSAS ──────────────────────────────────────────────────
 // Grupo densidad/volumen
