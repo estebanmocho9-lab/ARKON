@@ -141,7 +141,8 @@ const definition: AINeuronProfile = {
       "sio2",
       "fe2o3",
       "cec"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
