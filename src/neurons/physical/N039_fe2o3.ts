@@ -141,7 +141,8 @@ const definition: AINeuronProfile = {
       "sio2",
       "al2o3",
       "conductividad_electrica"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
