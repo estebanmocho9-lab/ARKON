@@ -139,7 +139,8 @@ const definition: AINeuronProfile = {
       "cao",
       "cec",
       "potencial_zeta"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
