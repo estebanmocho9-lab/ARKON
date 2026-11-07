@@ -1,6 +1,5 @@
 import { AgenticNeuron } from "../agenticNeuron";
 import type { AINeuronProfile } from "../types";
-import { N026_DifusividadTermica } from "../../physical/N026_difusividad_termica";
 
 /** AI clone of direct ARKON neuron N-026; validates its original class at construction. */
 const definition: AINeuronProfile = {
@@ -147,10 +146,9 @@ const definition: AINeuronProfile = {
     ]
   }
 };
-const sourceNeuron = new N026_DifusividadTermica();
 
 export class AgentNeuronN026 extends AgenticNeuron {
-  constructor() { super(definition, sourceNeuron); }
+  constructor() { super(definition); }
 }
 
 export const AI_NEURON_N026 = new AgentNeuronN026();
