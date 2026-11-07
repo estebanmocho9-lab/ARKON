@@ -139,7 +139,8 @@ const definition: AINeuronProfile = {
       "k2o",
       "ph",
       "conductividad_electrica"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
