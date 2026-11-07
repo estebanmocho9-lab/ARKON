@@ -63,56 +63,56 @@ function physicalConstructor(module: Record<string, unknown>): PhysicalNeuronCon
  * Cada clase física es ahora el wrapper canónico de su perfil IA individual.
  */
 export const DIRECT_AI_NEURONS: AgenticNeuron[] = [
-  new (physicalConstructor(Physical001))(), // N001_densidad_real.ts
-  new (physicalConstructor(Physical002))(), // N002_densidad_aparente.ts
-  new (physicalConstructor(Physical003))(), // N003_porosidad_total.ts
-  new (physicalConstructor(Physical004))(), // N004_absorcion_agua.ts
-  new (physicalConstructor(Physical005))(), // N005_indice_vacios.ts
-  new (physicalConstructor(Physical006))(), // N006_tamano_particula.ts
-  new (physicalConstructor(Physical007))(), // N007_area_BET.ts
-  new (physicalConstructor(Physical008))(), // N008_volumen_poro.ts
-  new (physicalConstructor(Physical009))(), // N009_diametro_poro.ts
-  new (physicalConstructor(Physical010))(), // N010_tortuosidad.ts
-  new (physicalConstructor(Physical011))(), // N011_resistencia_compresion.ts
-  new (physicalConstructor(Physical012))(), // N012_resistencia_traccion.ts
-  new (physicalConstructor(Physical013))(), // N013_resistencia_flexion.ts
-  new (physicalConstructor(Physical014))(), // N014_modulo_young.ts
-  new (physicalConstructor(Physical015))(), // N015_modulo_corte.ts
-  new (physicalConstructor(Physical016))(), // N016_modulo_volumetrico.ts
-  new (physicalConstructor(Physical017))(), // N017_cohesion.ts
-  new (physicalConstructor(Physical018))(), // N018_dureza_mohs.ts
-  new (physicalConstructor(Physical019))(), // N019_angulo_friccion.ts
-  new (physicalConstructor(Physical020))(), // N020_poisson.ts
-  new (physicalConstructor(Physical021))(), // N021_conductividad_termica.ts
-  new (physicalConstructor(Physical022))(), // N022_calor_especifico.ts
-  new (physicalConstructor(Physical023))(), // N023_expansion_termica.ts
-  new (physicalConstructor(Physical024))(), // N024_temperatura_servicio.ts
-  new (physicalConstructor(Physical025))(), // N025_temperatura_fusion.ts
-  new (physicalConstructor(Physical026))(), // N026_difusividad_termica.ts
-  new (physicalConstructor(Physical027))(), // N027_permeabilidad_intrinseca.ts
-  new (physicalConstructor(Physical028))(), // N028_conductividad_hidraulica.ts
-  new (physicalConstructor(Physical029))(), // N029_difusion_agua.ts
-  new (physicalConstructor(Physical030))(), // N030_difusion_gases.ts
-  new (physicalConstructor(Physical031))(), // N031_difusion_ionica.ts
-  new (physicalConstructor(Physical032))(), // N032_ph.ts
-  new (physicalConstructor(Physical033))(), // N033_cec.ts
-  new (physicalConstructor(Physical034))(), // N034_adsorcion.ts
-  new (physicalConstructor(Physical035))(), // N035_conductividad_electrica.ts
-  new (physicalConstructor(Physical036))(), // N036_potencial_zeta.ts
-  new (physicalConstructor(Physical037))(), // N037_sio2.ts
-  new (physicalConstructor(Physical038))(), // N038_al2o3.ts
-  new (physicalConstructor(Physical039))(), // N039_fe2o3.ts
-  new (physicalConstructor(Physical040))(), // N040_cao.ts
-  new (physicalConstructor(Physical041))(), // N041_mgo.ts
-  new (physicalConstructor(Physical042))(), // N042_na2o.ts
-  new (physicalConstructor(Physical043))(), // N043_k2o.ts
-  new (physicalConstructor(Physical044))(), // N044_energia_superficial.ts
-  new (physicalConstructor(Physical045))(), // N045_angulo_contacto.ts
-  new (physicalConstructor(Physical046))(), // N046_trabajo_adhesion.ts
-  new (physicalConstructor(Physical047))(), // N047_espesor_doble_capa.ts
-  new (physicalConstructor(Physical048))(), // N048_huella_carbono.ts
-  new (physicalConstructor(Physical049))(), // N049_energia_incorporada.ts
-  new (physicalConstructor(Physical050))(), // N050_reciclabilidad.ts
+  new (physicalConstructor(Physical001 as unknown as Record<string, unknown>))(), // N001_densidad_real.ts
+  new (physicalConstructor(Physical002 as unknown as Record<string, unknown>))(), // N002_densidad_aparente.ts
+  new (physicalConstructor(Physical003 as unknown as Record<string, unknown>))(), // N003_porosidad_total.ts
+  new (physicalConstructor(Physical004 as unknown as Record<string, unknown>))(), // N004_absorcion_agua.ts
+  new (physicalConstructor(Physical005 as unknown as Record<string, unknown>))(), // N005_indice_vacios.ts
+  new (physicalConstructor(Physical006 as unknown as Record<string, unknown>))(), // N006_tamano_particula.ts
+  new (physicalConstructor(Physical007 as unknown as Record<string, unknown>))(), // N007_area_BET.ts
+  new (physicalConstructor(Physical008 as unknown as Record<string, unknown>))(), // N008_volumen_poro.ts
+  new (physicalConstructor(Physical009 as unknown as Record<string, unknown>))(), // N009_diametro_poro.ts
+  new (physicalConstructor(Physical010 as unknown as Record<string, unknown>))(), // N010_tortuosidad.ts
+  new (physicalConstructor(Physical011 as unknown as Record<string, unknown>))(), // N011_resistencia_compresion.ts
+  new (physicalConstructor(Physical012 as unknown as Record<string, unknown>))(), // N012_resistencia_traccion.ts
+  new (physicalConstructor(Physical013 as unknown as Record<string, unknown>))(), // N013_resistencia_flexion.ts
+  new (physicalConstructor(Physical014 as unknown as Record<string, unknown>))(), // N014_modulo_young.ts
+  new (physicalConstructor(Physical015 as unknown as Record<string, unknown>))(), // N015_modulo_corte.ts
+  new (physicalConstructor(Physical016 as unknown as Record<string, unknown>))(), // N016_modulo_volumetrico.ts
+  new (physicalConstructor(Physical017 as unknown as Record<string, unknown>))(), // N017_cohesion.ts
+  new (physicalConstructor(Physical018 as unknown as Record<string, unknown>))(), // N018_dureza_mohs.ts
+  new (physicalConstructor(Physical019 as unknown as Record<string, unknown>))(), // N019_angulo_friccion.ts
+  new (physicalConstructor(Physical020 as unknown as Record<string, unknown>))(), // N020_poisson.ts
+  new (physicalConstructor(Physical021 as unknown as Record<string, unknown>))(), // N021_conductividad_termica.ts
+  new (physicalConstructor(Physical022 as unknown as Record<string, unknown>))(), // N022_calor_especifico.ts
+  new (physicalConstructor(Physical023 as unknown as Record<string, unknown>))(), // N023_expansion_termica.ts
+  new (physicalConstructor(Physical024 as unknown as Record<string, unknown>))(), // N024_temperatura_servicio.ts
+  new (physicalConstructor(Physical025 as unknown as Record<string, unknown>))(), // N025_temperatura_fusion.ts
+  new (physicalConstructor(Physical026 as unknown as Record<string, unknown>))(), // N026_difusividad_termica.ts
+  new (physicalConstructor(Physical027 as unknown as Record<string, unknown>))(), // N027_permeabilidad_intrinseca.ts
+  new (physicalConstructor(Physical028 as unknown as Record<string, unknown>))(), // N028_conductividad_hidraulica.ts
+  new (physicalConstructor(Physical029 as unknown as Record<string, unknown>))(), // N029_difusion_agua.ts
+  new (physicalConstructor(Physical030 as unknown as Record<string, unknown>))(), // N030_difusion_gases.ts
+  new (physicalConstructor(Physical031 as unknown as Record<string, unknown>))(), // N031_difusion_ionica.ts
+  new (physicalConstructor(Physical032 as unknown as Record<string, unknown>))(), // N032_ph.ts
+  new (physicalConstructor(Physical033 as unknown as Record<string, unknown>))(), // N033_cec.ts
+  new (physicalConstructor(Physical034 as unknown as Record<string, unknown>))(), // N034_adsorcion.ts
+  new (physicalConstructor(Physical035 as unknown as Record<string, unknown>))(), // N035_conductividad_electrica.ts
+  new (physicalConstructor(Physical036 as unknown as Record<string, unknown>))(), // N036_potencial_zeta.ts
+  new (physicalConstructor(Physical037 as unknown as Record<string, unknown>))(), // N037_sio2.ts
+  new (physicalConstructor(Physical038 as unknown as Record<string, unknown>))(), // N038_al2o3.ts
+  new (physicalConstructor(Physical039 as unknown as Record<string, unknown>))(), // N039_fe2o3.ts
+  new (physicalConstructor(Physical040 as unknown as Record<string, unknown>))(), // N040_cao.ts
+  new (physicalConstructor(Physical041 as unknown as Record<string, unknown>))(), // N041_mgo.ts
+  new (physicalConstructor(Physical042 as unknown as Record<string, unknown>))(), // N042_na2o.ts
+  new (physicalConstructor(Physical043 as unknown as Record<string, unknown>))(), // N043_k2o.ts
+  new (physicalConstructor(Physical044 as unknown as Record<string, unknown>))(), // N044_energia_superficial.ts
+  new (physicalConstructor(Physical045 as unknown as Record<string, unknown>))(), // N045_angulo_contacto.ts
+  new (physicalConstructor(Physical046 as unknown as Record<string, unknown>))(), // N046_trabajo_adhesion.ts
+  new (physicalConstructor(Physical047 as unknown as Record<string, unknown>))(), // N047_espesor_doble_capa.ts
+  new (physicalConstructor(Physical048 as unknown as Record<string, unknown>))(), // N048_huella_carbono.ts
+  new (physicalConstructor(Physical049 as unknown as Record<string, unknown>))(), // N049_energia_incorporada.ts
+  new (physicalConstructor(Physical050 as unknown as Record<string, unknown>))(), // N050_reciclabilidad.ts
 ];
 
 export const AI_NEURON_PROFILES: AINeuronProfile[] = DIRECT_AI_NEURONS.map(neuron => neuron.profile);
