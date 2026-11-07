@@ -318,7 +318,11 @@ export abstract class NeuronBase {
         // normalizado real como fallback. Esto evita recursiones y evita volver
         // a pasar el valorDirecto de la neurona actual a otra propiedad.
         for (const nombre of faltantes) {
-          if (_neuronasEnProceso.has(nombre) || !NEURON_MAP[nombre]) continue;
+          if (!NEURON_MAP[nombre]) continue;
+          // Una neurona directa no puede recurrir a una inversa que lea Sheets.
+          // La ruta inversa sí conserva su acceso legado a dependencias directas.
+          if (this.orientation === 'direct' && NEURON_MAP[nombre].orientation === 'inverse') continue;
+          if (_neuronasEnProceso.has(nombre)) continue;
           _neuronasEnProceso.add(nombre);
           try {
             const neuronaDependiente = NEURON_MAP[nombre];
