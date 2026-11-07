@@ -147,11 +147,8 @@ export abstract class NeuronBase {
   }
 
   private async obtenerReglaMezcla(materialTipo?: string): Promise<{ formula: string }> {
-    if (materialTipo) {
-      const { data: dataEsp } = await supabase.from('reglas_mezcla').select('formula')
-        .eq('propiedad_nombre', this.propertyName).eq('activo', true).eq('tipo_material_aplica', materialTipo).limit(1).maybeSingle();
-      if (dataEsp) return { formula: dataEsp.formula };
-    }
+    // El esquema vigente de reglas_mezcla no contiene tipo_material_aplica.
+    // Se consulta únicamente por propiedad y estado activo; no se envía un filtro inexistente.
     const { data, error } = await supabase.from('reglas_mezcla').select('formula')
       .eq('propiedad_nombre', this.propertyName).eq('activo', true).limit(1).single();
     if (error || !data) return { formula: 'ponderada_lineal' };
