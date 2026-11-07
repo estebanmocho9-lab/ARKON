@@ -141,7 +141,8 @@ const definition: AINeuronProfile = {
       "area_BET",
       "cec",
       "potencial_zeta"
-    ]
+    ],
+    "confidenceDefault": 0.9
   }
 };
 
