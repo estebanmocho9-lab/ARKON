@@ -230,7 +230,7 @@ async function loadSupabaseScientificContext(profile: AINeuronProfile): Promise<
       .eq('activo', true)
       .limit(20),
     supabase.from('scientific_formulas')
-      .select('id, nombre, descripcion, ecuacion, forma_computable, propiedad_a, propiedad_b, tipo_relacion, output_nombre, peso_cientifico, confianza')
+      .select('id, nombre, descripcion, modulo, categoria, ecuacion, forma_computable, variables_input, propiedad_a, propiedad_b, tipo_relacion, output_nombre, output_unidad, dominio_fisico, materiales_aplica, estado_valido, rango_valido, restricciones, peso_cientifico, confianza, sensibilidad, depende_de, afecta_a, fuente')
       .or(formulaFilter)
       .order('peso_cientifico', { ascending: false })
       .limit(30),
