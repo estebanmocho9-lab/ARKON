@@ -120,7 +120,7 @@ export class LlamaTursoDataProvider implements NeuronDataProvider {
     const candidateProperty = normalizeLabel(candidate?.property ?? '');
     const coreCable = profile.cables.find(cable => cable.propertyName === propertyName);
     const expectedProperties = [propertyName, profile.attribute, coreCable?.measures ?? '', profile.sourceNeuron?.definition ?? ''].map(normalizeLabel).filter(Boolean);
-    const propertyMatches = Boolean(candidateProperty && expectedProperties.some(term => term && (candidateProperty === term || candidateProperty.includes(term) || term.includes(candidateProperty))));
+    const propertyMatches = Boolean(candidateProperty && expectedProperties.includes(candidateProperty));
     const valid = Boolean(
       candidate && materialMatches && propertyMatches &&
       Number.isFinite(value) &&
