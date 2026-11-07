@@ -141,7 +141,8 @@ const definition: AINeuronProfile = {
       "ph",
       "mgo",
       "resistencia_compresion"
-    ]
+    ],
+    "confidenceDefault": 0.98
   }
 };
 
